@@ -1,3 +1,4 @@
+HEAD
 import math
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
@@ -97,3 +98,6 @@ app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
 if __name__ == '__main__':
     app.run_polling()
+
+<سيتم تعبئة الكود الكامل هنا من الكانفَس لاحقاً>
+7cd790eda984d56750572d844902d9de027737ba
