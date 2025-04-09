@@ -3,7 +3,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 import os
 
-TOKEN = os.getenv("TOKEN")  # التوكن من متغير البيئة
+TOKEN = os.getenv("TOKEN")
 
 zone_prices = {
     "1": (12, 5),
@@ -29,13 +29,24 @@ special_cases = {
 
 war_zone_extra = ["Iraq", "Palestine", "Libya", "Yemen", "Syria"]
 
-# اختصار: الدول كلها محفوظة في هذا القاموس مسبقاً
-from countries_zones import country_zone_map  # بدك تعمل ملف خارجي له لاحقاً لو بدك تفصلهم
+# اختصار: هذا مثال مصغّر من قائمة الدول
+country_zone_map = {
+    "India": "2",
+    "Lebanon": "1",
+    "Syria": "1",
+    "Iraq": "3",
+    "Turkey": "3",
+    "Saudi Arabia": "2",
+    "USA": "4",
+    "Germany": "3",
+    "Jordan": "2",
+    "Morocco": "3"
+}
 
 def calculate_shipping(country: str, quantity: int, season: str) -> str:
     weight_per_piece = 0.5 if season == "صيفية" else 1
     total_weight = quantity * weight_per_piece
-    total_weight = math.ceil(total_weight * 2) / 2  # تقريب لأقرب نصف كيلو
+    total_weight = math.ceil(total_weight * 2) / 2
 
     if country in special_cases:
         if country == "فلسطين":
