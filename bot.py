@@ -98,5 +98,3 @@ app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
 if __name__ == '__main__':
     app.run_polling()
-
-<سيتم تعبئة الكود الكامل هنا من الكانفَس لاحقاً>
