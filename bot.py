@@ -35,20 +35,20 @@ special_cases = {
 def convert_arabic_numerals(text):
     return text.translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))
 
-# --- مطابقة تقريبية للدول ---
+# --- حساب الوزن من عدد القطع ---
+def get_weight_from_pieces(pieces: int, type_: str) -> float:
+    if "صيف" in type_:
+        return pieces * 0.5
+    elif "شت" in type_:
+        return pieces * 1.0
+    else:
+        return -1
+
+# --- مطابقة الدول تقريبياً ---
 def match_country(user_input, countries):
     user_input = user_input.replace("ه", "ة")
     result = process.extractOne(user_input, countries)
     return result[0] if result and result[1] >= 80 else None
-
-# --- استخراج الوزن من قطع ونوع ---
-def get_weight_from_pieces(pieces: int, type_: str) -> float:
-    if "صيف" in type_:
-        return pieces * 0.3
-    elif "شت" in type_:
-        return pieces * 0.5
-    else:
-        return -1  # نوع غير معروف
 
 # --- حساب السعر ---
 def calculate_shipping(country, weight, region=None):
@@ -86,7 +86,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parts = text.split()
 
         if len(parts) < 2:
-            await update.message.reply_text("⚠️ يرجى كتابة: الدولة [الوزن كغ] أو الدولة [عدد القطع] [صيفي/شتوي]")
+            await update.message.reply_text("⚠️ يرجى كتابة: الدولة [الوزن كغ] أو [عدد] [صيفي/شتوي]")
             return
 
         if "فلسطين" in parts[0]:
@@ -101,28 +101,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             region = None
             remaining = parts[1:]
 
-        # دمج الباقي وتحويل الأرقام العربية
-        rest_text = convert_arabic_numerals(" ".join(remaining)).replace("كغ", "").replace(" ", "")
+        rest = convert_arabic_numerals(" ".join(remaining)).replace("كغ", "").strip()
 
-        # 1. محاولة قراءة الوزن مباشرة
+        # محاولة فهم الوزن مباشرة
         try:
-            weight = float(rest_text)
-        except ValueError:
-            # 2. محاولة استخراج من "عدد القطع + نوع"
-            if "قطع" in text or "قطعة" in text:
-                try:
-                    # مثال: 3 قطع صيفي
-                    for i, word in enumerate(remaining):
-                        if "قطع" in word or "قطعة" in word:
-                            count = int(convert_arabic_numerals(remaining[i - 1]))
-                            type_ = " ".join(remaining[i + 1:])  # بعد "قطع"
-                            weight = get_weight_from_pieces(count, type_)
-                            if weight == -1:
-                                raise ValueError("نوع القطع غير معروف")
-                            break
-                except:
-                    await update.message.reply_text("⚠️ لم أتمكن من فهم عدد القطع أو نوعها (صيفي / شتوي).")
-                    return
+            weight = float(rest.replace(" ", ""))
+        except:
+            # محاولة فهم (عدد + نوع) بدون الحاجة لكلمة "قطع"
+            numbers = [word for word in remaining if word.isdigit() or word in "٠١٢٣٤٥٦٧٨٩"]
+            types = [word for word in remaining if "صيف" in word or "شت" in word]
+
+            if numbers and types:
+                count = int(convert_arabic_numerals(numbers[0]))
+                type_ = " ".join(types)
+                weight = get_weight_from_pieces(count, type_)
+                if weight == -1:
+                    raise Exception("نوع القطع غير معروف")
             else:
                 await update.message.reply_text("⚠️ لم أتمكن من فهم الوزن أو عدد القطع.")
                 return
@@ -133,7 +127,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"حدث خطأ غير متوقع: {e}")
 
-# --- تشغيل Webhook ---
+# --- Webhook على Render ---
 if __name__ == '__main__':
     from telegram.ext import Application
     print("🚀 البوت يعمل باستخدام Webhook")
