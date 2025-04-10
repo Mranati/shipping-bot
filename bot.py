@@ -19,10 +19,10 @@ zone_prices = {
 # --- الاستثناءات ---
 special_cases = {
     "السعودية": lambda w: (15 if w <= 0.5 else 15 + math.ceil((w - 0.5) / 0.5) * 5),
-    "فلسطين": lambda w: (
-        11 if w <= 2 else 11 + math.ceil((w - 2) / 0.5) * 5,
-        13 if w <= 2 else 13 + math.ceil((w - 2) / 0.5) * 5,
-        20 if w <= 2 else 20 + math.ceil((w - 2) / 0.5) * 5
+    "فلسطين": lambda w, area: (
+        11 if area == "الضفة" and w <= 2 else 11 + math.ceil((w - 2) / 0.5) * 5,
+        13 if area == "القدس" and w <= 2 else 13 + math.ceil((w - 2) / 0.5) * 5,
+        20 if area == "الداخل" and w <= 2 else 20 + math.ceil((w - 2) / 0.5) * 5
     ),
     "سوريا": lambda w: 35 if w <= 2 else 35 + math.ceil((w - 2) / 0.5) * 12,
     "لبنان": lambda w: 35 if w <= 2 else 35 + math.ceil((w - 2) / 0.5) * 12,
@@ -42,15 +42,24 @@ def match_country(user_input, countries):
     return result[0] if result and result[1] >= 80 else None
 
 # --- دالة الحساب ---
-def calculate_shipping(country, quantity, season):
-    weight = quantity * (0.5 if season == "صيفية" else 1)
+def calculate_shipping(country, qty_or_weight, season, area=None):
+    if "كغ" in qty_or_weight or "kg" in qty_or_weight.lower():
+        # إذا تم إدخال الوزن
+        weight = float(qty_or_weight.replace("كغ", "").replace("kg", ""))
+    else:
+        # إذا كان يتم استخدام عدد القطع
+        weight = int(qty_or_weight) * (0.5 if season == "صيفية" else 1)
 
     # تحقق من استثناءات أولاً
     if country in special_cases:
-        price = special_cases[country](weight)
-        if isinstance(price, tuple):
+        if country == "فلسطين":
+            price = special_cases[country](weight, area)
             return f"السعر: {price[0]} / {price[1]} / {price[2]} دينار\nالتفاصيل: استثناء خاص ({country})"
-        return f"السعر: {price} دينار\nالتفاصيل: {weight} كغ → استثناء خاص ({country})"
+        else:
+            price = special_cases[country](weight)
+            if isinstance(price, tuple):
+                return f"السعر: {price[0]} / {price[1]} / {price[2]} دينار\nالتفاصيل: استثناء خاص ({country})"
+            return f"السعر: {price} دينار\nالتفاصيل: {weight} كغ → استثناء خاص ({country})"
 
     # منطقة الدولة
     zone = country_zone_map.get(country)
@@ -75,23 +84,35 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = update.message.text.strip()
         parts = text.split()
 
-        if len(parts) != 3:
-            await update.message.reply_text("⚠️ يرجى إدخال: الدولة عدد القطع الموسم (صيفية/شتوية)")
+        if len(parts) != 3 and len(parts) != 4:
+            await update.message.reply_text("⚠️ يرجى إدخال: الدولة عدد القطع أو الوزن الموسم (صيفية/شتوية) المنطقة (فلسطين فقط)")
             return
 
-        raw_country, qty, season = parts
-        country = match_country(raw_country, list(country_zone_map.keys()) + list(special_cases.keys()))
+        raw_country, qty_or_weight, season = parts[:3]
+        area = parts[3] if len(parts) == 4 else None
 
+        # ✅ التصحيح الإملائي للموسم
+        if season in ["صيفي", "صيفية"]:
+            season = "صيفية"
+        elif season in ["شتوي", "شتوية"]:
+            season = "شتوية"
+        else:
+            await update.message.reply_text("⚠️ نوع القطع يجب أن يكون صيفية أو شتوية فقط")
+            return
+
+        # ✅ المطابقة التقريبية لاسم الدولة
+        country = match_country(raw_country, list(country_zone_map.keys()) + list(special_cases.keys()))
         if not country:
             await update.message.reply_text("❌ الدولة غير معروفة")
             return
 
-        if season not in ["صيفية", "شتوية"]:
-            await update.message.reply_text("⚠️ نوع القطع يجب أن يكون صيفية أو شتوية فقط")
+        # ✅ إذا كانت فلسطين يجب أن يذكر المنطقة
+        if country == "فلسطين" and area not in ["الضفة", "القدس", "الداخل"]:
+            await update.message.reply_text("⚠️ يرجى تحديد المنطقة داخل فلسطين: الضفة، القدس أو الداخل")
             return
 
-        quantity = int(qty)
-        response = calculate_shipping(country, quantity, season)
+        # ✅ التحقق إذا القيمة وزن أو عدد قطع
+        response = calculate_shipping(country, qty_or_weight, season, area)
         await update.message.reply_text(response)
 
     except Exception as e:
