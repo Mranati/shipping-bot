@@ -3,6 +3,7 @@ import os
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 from rapidfuzz import process
+import time
 
 TOKEN = os.getenv("TOKEN")
 
@@ -16,7 +17,7 @@ zone_prices = {
     "A": (28, 16)
 }
 
-# --- الاستثناءات ---
+# --- استثناءات ---
 special_cases = {
     "السعودية": lambda w: (15 if w <= 0.5 else 15 + math.ceil((w - 0.5) / 0.5) * 5),
     "فلسطين": lambda w: (
@@ -98,6 +99,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         # ✅ التحقق إذا القيمة وزن أو عدد قطع
         if "كغ" in qty_or_weight or "kg" in qty_or_weight.lower():
+            # إذا تم إدخال الوزن
             weight = float(qty_or_weight.replace("كغ", "").replace("kg", ""))
             if country in special_cases:
                 price = special_cases[country](weight)
@@ -125,10 +127,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"حدث خطأ: {e}")
 
-
 # --- تشغيل البوت ---
 app = ApplicationBuilder().token(TOKEN).build()
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-if __name__ == '__main__':
+# تحقق من أنه لا يوجد بوت آخر يعمل بنفس الوقت
+import os
+if "telegram_bot" in os.popen("ps aux").read():
+    print("يتم تشغيل بوت آخر. إيقاف البوت الحالي.")
+else:
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.run_polling()
+
