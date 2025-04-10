@@ -76,26 +76,55 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parts = text.split()
 
         if len(parts) != 3:
-            await update.message.reply_text("⚠️ يرجى إدخال: الدولة عدد القطع الموسم (صيفية/شتوية)")
+            await update.message.reply_text("⚠️ يرجى إدخال: الدولة عدد القطع أو الوزن الموسم (صيفية/شتوية)")
             return
 
-        raw_country, qty, season = parts
-        country = match_country(raw_country, list(country_zone_map.keys()) + list(special_cases.keys()))
+        raw_country, qty_or_weight, season = parts
 
+        # ✅ التصحيح الإملائي للموسم
+        if season in ["صيفي", "صيفية"]:
+            season = "صيفية"
+        elif season in ["شتوي", "شتوية"]:
+            season = "شتوية"
+        else:
+            await update.message.reply_text("⚠️ نوع القطع يجب أن يكون صيفية أو شتوية فقط")
+            return
+
+        # ✅ المطابقة التقريبية لاسم الدولة
+        country = match_country(raw_country, list(country_zone_map.keys()) + list(special_cases.keys()))
         if not country:
             await update.message.reply_text("❌ الدولة غير معروفة")
             return
 
-        if season not in ["صيفية", "شتوية"]:
-            await update.message.reply_text("⚠️ نوع القطع يجب أن يكون صيفية أو شتوية فقط")
-            return
+        # ✅ التحقق إذا القيمة وزن أو عدد قطع
+        if "كغ" in qty_or_weight or "kg" in qty_or_weight.lower():
+            weight = float(qty_or_weight.replace("كغ", "").replace("kg", ""))
+            if country in special_cases:
+                price = special_cases[country](weight)
+                if isinstance(price, tuple):
+                    return await update.message.reply_text(f"السعر: {price[0]} / {price[1]} / {price[2]} دينار\nالتفاصيل: استثناء خاص ({country})")
+                return await update.message.reply_text(f"السعر: {price} دينار\nالتفاصيل: {weight} كغ → استثناء خاص ({country})")
 
-        quantity = int(qty)
+            zone = country_zone_map.get(country)
+            if not zone:
+                return await update.message.reply_text("❌ الدولة غير مدرجة في قائمة الشحن")
+
+            base, extra = zone_prices[zone]
+            total = base if weight <= 0.5 else base + math.ceil((weight - 0.5) / 0.5) * extra
+            if country in war_zone_extra and country not in ["فلسطين", "سوريا", "لبنان", "العراق", "تركيا"]:
+                total += 15
+                return await update.message.reply_text(f"السعر: {total} دينار\nالتفاصيل: {weight} كغ → المنطقة {zone} → {base} + إضافات حرب + وزن إضافي")
+
+            return await update.message.reply_text(f"السعر: {total} دينار\nالتفاصيل: {weight} كغ → المنطقة {zone} → {base} + وزن إضافي")
+
+        # إذا كانت عدد قطع → نفس الحساب القديم
+        quantity = int(qty_or_weight)
         response = calculate_shipping(country, quantity, season)
         await update.message.reply_text(response)
 
     except Exception as e:
         await update.message.reply_text(f"حدث خطأ: {e}")
+
 
 # --- تشغيل البوت ---
 app = ApplicationBuilder().token(TOKEN).build()
