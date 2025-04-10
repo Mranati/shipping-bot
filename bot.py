@@ -81,27 +81,32 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = update.message.text.strip()
         parts = text.split()
 
-        if len(parts) != 3:
-            await update.message.reply_text("⚠️ يرجى إدخال: الدولة المنطقة (إذا كانت فلسطين) الوزن مع وحدة 'كغ'")
+        if len(parts) < 3:
+            await update.message.reply_text("⚠️ يرجى إدخال: الدولة (أو فلسطين المنطقة) الوزن مع وحدة 'كغ'")
             return
-
-        raw_country, region_or_weight, qty = parts
-
-        # إذا كانت الدولة فلسطين
-        if "فلسطين" in raw_country:
+        
+        # التحقق إذا كانت المدخلات تخص فلسطين
+        if "فلسطين" in parts[0]:
+            # التعامل مع فلسطين مع مسافة بين الوزن وكغ
+            weight_part = parts[2]
+            if "كغ" not in weight_part:
+                await update.message.reply_text("⚠️ الوزن يجب أن يكون مع 'كغ' مع مسافة بين الوزن وكغ.")
+                return
+            weight = float(weight_part.replace("كغ", "").strip())
             country = "فلسطين"
-            region = region_or_weight  # تحديد المنطقة (الضفة، القدس، الداخل)
-            quantity = float(qty.replace("كغ", "").strip())  # استخدام الوزن بدلًا من عدد القطع
+            region = parts[1]
         else:
-            country = match_country(raw_country, list(country_zone_map.keys()) + list(special_cases.keys()))
-            region = None  # باقي الدول لا يحتاجون إلى منطقة
-            quantity = float(region_or_weight.replace("كغ", "").strip())  # استخدام الوزن
+            # التعامل مع باقي الدول مع مسافة بين الوزن وكغ
+            country = parts[0]
+            region = None
+            weight_part = parts[1]
+            if "كغ" not in weight_part:
+                await update.message.reply_text("⚠️ الوزن يجب أن يكون مع 'كغ' مع مسافة بين الوزن وكغ.")
+                return
+            weight = float(weight_part.replace("كغ", "").strip())
 
-        if not country:
-            await update.message.reply_text("❌ الدولة غير معروفة")
-            return
-
-        response = calculate_shipping(country, quantity, region if country == "فلسطين" else None)
+        # حساب السعر بناءً على المدخلات
+        response = calculate_shipping(country, weight, region if country == "فلسطين" else None)
         await update.message.reply_text(response)
 
     except Exception as e:
