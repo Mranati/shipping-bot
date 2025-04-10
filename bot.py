@@ -3,7 +3,7 @@ import os
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 from rapidfuzz import process
-from country_zone_map_full import country_zone_map
+from country_zone_map_full_UPDATED import country_zone_map
 
 TOKEN = os.getenv("TOKEN")
 
@@ -31,11 +31,41 @@ special_cases = {
     "تركيا": lambda w: 30 + math.ceil((w - 2) / 0.5) * 5 if w > 2 else 30
 }
 
-# --- تحويل الأرقام العربية إلى إنجليزية ---
+# --- Aliases: أسماء بديلة للدول ---
+country_aliases = {
+    "امريكا": "الولايات المتحدة",
+    "أمريكا": "الولايات المتحدة",
+    "انجلترا": "المملكة المتحدة",
+    "إنجلترا": "المملكة المتحدة",
+    "بريطانيا": "المملكة المتحدة",
+    "روسيا": "الاتحاد الروسي",
+    "كوريا الجنوبية": "جمهورية كوريا",
+    "كوريا الشمالية": "جمهورية كوريا الشعبية الديمقراطية",
+    "المانيا": "ألمانيا",
+    "هولندا": "هولندا",
+    "النيذرلاندز": "هولندا",
+    "التشيك": "جمهورية التشيك",
+    "سلوفاكيا": "الجمهورية السلوفاكية",
+    "اليونان": "جمهورية اليونان",
+    "الصين": "جمهورية الصين الشعبية",
+    "تايوان": "تايوان، مقاطعة الصين",
+    "الكونغو": "جمهورية الكونغو",
+    "الكونغو الديمقراطية": "جمهورية الكونغو الديمقراطية",
+    "الامارات": "الإمارات العربية المتحدة",
+    "السودان الجنوبي": "جنوب السودان",
+    "كوريا": "جمهورية كوريا",
+    "فنزويلا": "جمهورية فنزويلا البوليفارية",
+    "ساحل العاج": "كوت ديفوار",
+    "كندا": "كندا",
+    "مصر": "مصر",
+    "الاردن": "الأردن",
+    "اسرائيل": "إسرائيل",
+    "نيوزيلندا": "نيوزيلندا",
+}
+
 def convert_arabic_numerals(text):
     return text.translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))
 
-# --- حساب الوزن من عدد القطع ---
 def get_weight_from_pieces(pieces: int, type_: str) -> float:
     if "صيف" in type_:
         return pieces * 0.5
@@ -44,13 +74,13 @@ def get_weight_from_pieces(pieces: int, type_: str) -> float:
     else:
         return -1
 
-# --- مطابقة الدول تقريبياً ---
 def match_country(user_input, countries):
     user_input = user_input.replace("ه", "ة")
+    if user_input in country_aliases:
+        return country_aliases[user_input]
     result = process.extractOne(user_input, countries)
     return result[0] if result and result[1] >= 80 else None
 
-# --- حساب السعر ---
 def calculate_shipping(country, weight, region=None):
     if country == "فلسطين" and region:
         price = special_cases["فلسطين"](weight, region)
@@ -107,11 +137,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         rest = convert_arabic_numerals(" ".join(remaining)).replace("كغ", "").strip()
 
-        # محاولة فهم الوزن مباشرة
         try:
             weight = float(rest.replace(" ", ""))
         except:
-            # محاولة فهم (عدد + نوع) بدون الحاجة لكلمة "قطع"
             numbers = [word for word in remaining if word.isdigit() or any(c in "٠١٢٣٤٥٦٧٨٩" for c in word)]
             types = [word for word in remaining if "صيف" in word or "شت" in word]
 
