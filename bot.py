@@ -115,5 +115,5 @@ app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
 if __name__ == '__main__':
-     print("Restarting...")  # ← هذا هو السطر المطلوب
-    app.run_polling()
+    print("Restarting...")       # 4 فراغات أو 1 تاب
+    app.run_polling()           # نفس عدد الفراغات
