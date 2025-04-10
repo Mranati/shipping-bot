@@ -4,6 +4,9 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 from rapidfuzz import process
 
+# استيراد قائمة الدول من الملف الخارجي
+from country_zone_map_full import country_zone_map
+
 TOKEN = os.getenv("TOKEN")
 
 # --- الأسعار حسب المنطقة ---
@@ -16,24 +19,25 @@ zone_prices = {
     "A": (28, 16)
 }
 
-# --- الاستثناءات ---
-special_cases = {
-    "السعودية": lambda w: (15 if w <= 0.5 else 15 + math.ceil((w - 0.5) / 0.5) * 5),
-    "فلسطين": lambda w, region: (
-        11 if region == "الضفة" and w <= 2 else 11 + math.ceil((w - 2) / 0.5) * 5 if region == "الضفة" else
-        13 if region == "القدس" and w <= 2 else 13 + math.ceil((w - 2) / 0.5) * 5 if region == "القدس" else
-        20 if region == "الداخل" and w <= 2 else 20 + math.ceil((w - 2) / 0.5) * 5),
-    "سوريا": lambda w: 35 if w <= 2 else 35 + math.ceil((w - 2) / 0.5) * 12,
-    "لبنان": lambda w: 35 if w <= 2 else 35 + math.ceil((w - 2) / 0.5) * 12,
-    "العراق": lambda w: 30 if w <= 2 else 30 + math.ceil((w - 2) / 0.5) * 8,
-    "تركيا": lambda w: 30 if w <= 2 else 30 + math.ceil((w - 2) / 0.5) * 8
+# --- استثناءات فلسطين ---
+special_cases_palestine = {
+    "الضفة": lambda w: 11 + math.ceil((w - 2) / 0.5) * 5 if w > 2 else 11,
+    "القدس": lambda w: 13 + math.ceil((w - 2) / 0.5) * 5 if w > 2 else 13,
+    "الداخل": lambda w: 20 + math.ceil((w - 2) / 0.5) * 5 if w > 2 else 20
 }
 
-# --- دول مناطق الحرب ---
-war_zone_extra = ["العراق", "فلسطين", "ليبيا", "اليمن", "سوريا"]
+# --- استثناءات الدول الأخرى ---
+special_cases = {
+    "السعودية": lambda w: 15 + math.ceil((w - 0.5) / 0.5) * 5 if w > 0.5 else 15,
+    "فلسطين": lambda w, region: special_cases_palestine.get(region, lambda w: "منطقة غير صحيحة")(w),
+    "سوريا": lambda w: 35 + math.ceil((w - 2) / 0.5) * 5 if w > 2 else 35,
+    "لبنان": lambda w: 35 + math.ceil((w - 2) / 0.5) * 5 if w > 2 else 35,
+    "العراق": lambda w: 30 + math.ceil((w - 2) / 0.5) * 5 if w > 2 else 30,
+    "تركيا": lambda w: 30 + math.ceil((w - 2) / 0.5) * 5 if w > 2 else 30
+}
 
-# --- الدول العادية --- 
-normal_countries = list(country_zone_map.keys())
+# --- دول أخرى ---
+country_zone_map = country_zone_map  # استيراد قائمة البلدان من الملف الخارجي
 
 # --- دالة مطابقة تقريبية للاسم ---
 def match_country(user_input, countries):
@@ -41,24 +45,24 @@ def match_country(user_input, countries):
     result = process.extractOne(user_input, countries)
     return result[0] if result and result[1] >= 80 else None
 
-# --- دالة الحساب ---
-def calculate_shipping(country, quantity, season, region=None):
-    weight = quantity * (0.5 if season == "صيفية" or season == "صيفي" else 1)
+# --- دالة حساب السعر ---
+def calculate_shipping(country, quantity, region=None):
+    weight = quantity  # الوزن يتم تحديده مباشرة من المدخلات بدون الحاجة للموسم أو القطع
 
-    # تحقق من استثناءات أولاً
+    # التحقق من استثناءات فلسطين
+    if country == "فلسطين" and region:
+        # حساب السعر بناءً على المنطقة فقط
+        price = special_cases["فلسطين"](weight, region)
+        if price == "منطقة غير صحيحة":
+            return "⚠️ المنطقة غير صحيحة. يرجى اختيار (الضفة، القدس، الداخل)"
+        return f"السعر: {price} دينار\nالتفاصيل: {weight} كغ → استثناء خاص ({country} - {region})"
+    
+    # التحقق من استثناءات الدول الأخرى
     if country in special_cases:
-        # إذا كانت فلسطين، نتأكد من المنطقة
-        if country == "فلسطين":
-            if region not in ["الضفة", "القدس", "الداخل"]:
-                return "⚠️ المنطقة غير صحيحة. يرجى اختيار (الضفة، القدس، الداخل)"
-            price = special_cases[country](weight, region)
-            return f"السعر: {price} دينار\nالتفاصيل: {weight} كغ → استثناء خاص ({country} - {region})"
-        
-        # لحساب الأسعار لبقية الدول الاستثنائية
         price = special_cases[country](weight)
         return f"السعر: {price} دينار\nالتفاصيل: {weight} كغ → استثناء خاص ({country})"
 
-    # منطقة الدولة
+    # منطقة الدولة (في حالة الدول العادية)
     zone = country_zone_map.get(country)
     if not zone:
         return "❌ الدولة غير مدرجة في قائمة الشحن"
@@ -69,10 +73,6 @@ def calculate_shipping(country, quantity, season, region=None):
     else:
         total = base + math.ceil((weight - 0.5) / 0.5) * extra
 
-    if country in war_zone_extra and country not in ["فلسطين", "سوريا", "لبنان", "العراق", "تركيا"]:
-        total += 15
-        return f"السعر: {total} دينار\nالتفاصيل: {weight} كغ → المنطقة {zone} → {base} + إضافات حرب + وزن إضافي"
-
     return f"السعر: {total} دينار\nالتفاصيل: {weight} كغ → المنطقة {zone} → {base} + وزن إضافي"
 
 # --- الرد على الرسائل ---  
@@ -81,31 +81,27 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = update.message.text.strip()
         parts = text.split()
 
-        if len(parts) != 4:
-            await update.message.reply_text("⚠️ يرجى إدخال: الدولة المنطقة عدد القطع/الوزن الموسم (صيفي/شتوي)")
+        if len(parts) != 3:
+            await update.message.reply_text("⚠️ يرجى إدخال: الدولة المنطقة (إذا كانت فلسطين) الوزن مع وحدة 'كغ'")
             return
 
-        raw_country, region, qty, season = parts
+        raw_country, region_or_weight, qty = parts
 
         # إذا كانت الدولة فلسطين
         if "فلسطين" in raw_country:
             country = "فلسطين"
-            region = region  # تحديد المنطقة (الضفة، القدس، الداخل)
-            quantity = float(qty)  # استخدام الوزن بدلًا من عدد القطع
+            region = region_or_weight  # تحديد المنطقة (الضفة، القدس، الداخل)
+            quantity = float(qty.replace("كغ", "").strip())  # استخدام الوزن بدلًا من عدد القطع
         else:
             country = match_country(raw_country, list(country_zone_map.keys()) + list(special_cases.keys()))
             region = None  # باقي الدول لا يحتاجون إلى منطقة
-            quantity = int(qty)
+            quantity = float(region_or_weight.replace("كغ", "").strip())  # استخدام الوزن
 
         if not country:
             await update.message.reply_text("❌ الدولة غير معروفة")
             return
 
-        if season not in ["صيفية", "شتوية", "صيفي", "شتوي"]:
-            await update.message.reply_text("⚠️ نوع القطع يجب أن يكون صيفي/صيفية أو شتوي/شتوية فقط")
-            return
-
-        response = calculate_shipping(country, quantity, season, region if country == "فلسطين" else None)
+        response = calculate_shipping(country, quantity, region if country == "فلسطين" else None)
         await update.message.reply_text(response)
 
     except Exception as e:
