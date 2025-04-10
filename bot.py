@@ -115,5 +115,13 @@ app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
 if __name__ == '__main__':
-    print("Restarting...")       # 4 فراغات أو 1 تاب
-    app.run_polling()           # نفس عدد الفراغات
+    import sys
+
+    print("🚀 البوت يعمل باستخدام Webhook")
+
+    port = int(os.environ.get('PORT', 8443))
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=port,
+        webhook_url=f"https://{os.environ['RENDER_EXTERNAL_HOSTNAME']}/"
+    )
