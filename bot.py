@@ -3,7 +3,6 @@ import os
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 from rapidfuzz import process
-import time
 
 TOKEN = os.getenv("TOKEN")
 
@@ -17,7 +16,7 @@ zone_prices = {
     "A": (28, 16)
 }
 
-# --- استثناءات ---
+# --- الاستثناءات ---
 special_cases = {
     "السعودية": lambda w: (15 if w <= 0.5 else 15 + math.ceil((w - 0.5) / 0.5) * 5),
     "فلسطين": lambda w: (
@@ -34,7 +33,7 @@ special_cases = {
 # --- دول مناطق الحرب ---
 war_zone_extra = ["العراق", "فلسطين", "ليبيا", "اليمن", "سوريا"]
 
-from country_zone_map_full import country_zone_map
+from country_zone_map_full import country_zone_map  # تم تضمين الملف هنا
 
 # --- دالة مطابقة تقريبية للاسم ---
 def match_country(user_input, countries):
@@ -77,50 +76,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parts = text.split()
 
         if len(parts) != 3:
-            await update.message.reply_text("⚠️ يرجى إدخال: الدولة عدد القطع أو الوزن الموسم (صيفية/شتوية)")
+            await update.message.reply_text("⚠️ يرجى إدخال: الدولة عدد القطع الموسم (صيفية/شتوية)")
             return
 
-        raw_country, qty_or_weight, season = parts
-
-        # ✅ التصحيح الإملائي للموسم
-        if season in ["صيفي", "صيفية"]:
-            season = "صيفية"
-        elif season in ["شتوي", "شتوية"]:
-            season = "شتوية"
-        else:
-            await update.message.reply_text("⚠️ نوع القطع يجب أن يكون صيفية أو شتوية فقط")
-            return
-
-        # ✅ المطابقة التقريبية لاسم الدولة
+        raw_country, qty, season = parts
         country = match_country(raw_country, list(country_zone_map.keys()) + list(special_cases.keys()))
+
         if not country:
             await update.message.reply_text("❌ الدولة غير معروفة")
             return
 
-        # ✅ التحقق إذا القيمة وزن أو عدد قطع
-        if "كغ" in qty_or_weight or "kg" in qty_or_weight.lower():
-            # إذا تم إدخال الوزن
-            weight = float(qty_or_weight.replace("كغ", "").replace("kg", ""))
-            if country in special_cases:
-                price = special_cases[country](weight)
-                if isinstance(price, tuple):
-                    return await update.message.reply_text(f"السعر: {price[0]} / {price[1]} / {price[2]} دينار\nالتفاصيل: استثناء خاص ({country})")
-                return await update.message.reply_text(f"السعر: {price} دينار\nالتفاصيل: {weight} كغ → استثناء خاص ({country})")
+        if season not in ["صيفية", "شتوية"]:
+            await update.message.reply_text("⚠️ نوع القطع يجب أن يكون صيفية أو شتوية فقط")
+            return
 
-            zone = country_zone_map.get(country)
-            if not zone:
-                return await update.message.reply_text("❌ الدولة غير مدرجة في قائمة الشحن")
-
-            base, extra = zone_prices[zone]
-            total = base if weight <= 0.5 else base + math.ceil((weight - 0.5) / 0.5) * extra
-            if country in war_zone_extra and country not in ["فلسطين", "سوريا", "لبنان", "العراق", "تركيا"]:
-                total += 15
-                return await update.message.reply_text(f"السعر: {total} دينار\nالتفاصيل: {weight} كغ → المنطقة {zone} → {base} + إضافات حرب + وزن إضافي")
-
-            return await update.message.reply_text(f"السعر: {total} دينار\nالتفاصيل: {weight} كغ → المنطقة {zone} → {base} + وزن إضافي")
-
-        # إذا كانت عدد قطع → نفس الحساب القديم
-        quantity = int(qty_or_weight)
+        quantity = int(qty)
         response = calculate_shipping(country, quantity, season)
         await update.message.reply_text(response)
 
@@ -129,12 +99,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 # --- تشغيل البوت ---
 app = ApplicationBuilder().token(TOKEN).build()
+app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-# تحقق من أنه لا يوجد بوت آخر يعمل بنفس الوقت
-import os
-if "telegram_bot" in os.popen("ps aux").read():
-    print("يتم تشغيل بوت آخر. إيقاف البوت الحالي.")
-else:
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+if __name__ == '__main__':
     app.run_polling()
-
