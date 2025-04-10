@@ -1,3 +1,5 @@
+# تعديل الكود كما هو مطلوب
+
 import math
 import os
 from telegram import Update
@@ -19,6 +21,11 @@ zone_prices = {
 # --- الاستثناءات ---
 special_cases = {
     "السعودية": lambda w: (15 if w <= 0.5 else 15 + math.ceil((w - 0.5) / 0.5) * 5),
+    "فلسطين": lambda w, region: (
+        11 if region == "الضفة" and w <= 2 else 11 + math.ceil((w - 2) / 0.5) * 5,
+        13 if region == "القدس" and w <= 2 else 13 + math.ceil((w - 2) / 0.5) * 5,
+        20 if region == "الداخل" and w <= 2 else 20 + math.ceil((w - 2) / 0.5) * 5
+    ),
     "سوريا": lambda w: 35 if w <= 2 else 35 + math.ceil((w - 2) / 0.5) * 12,
     "لبنان": lambda w: 35 if w <= 2 else 35 + math.ceil((w - 2) / 0.5) * 12,
     "العراق": lambda w: 30 if w <= 2 else 30 + math.ceil((w - 2) / 0.5) * 8,
@@ -36,31 +43,13 @@ def match_country(user_input, countries):
     result = process.extractOne(user_input, countries)
     return result[0] if result and result[1] >= 80 else None
 
-# --- تعديل خاص لفلسطين ---
-special_cases_palestine = {
-    "الضفة": lambda w: (11 if w <= 2 else 11 + math.ceil((w - 2) / 0.5) * 5),
-    "القدس": lambda w: (13 if w <= 2 else 13 + math.ceil((w - 2) / 0.5) * 5),
-    "الداخل": lambda w: (20 if w <= 2 else 20 + math.ceil((w - 2) / 0.5) * 5)
-}
-
 # --- دالة الحساب ---
-def calculate_shipping(country, qty_or_weight, season, area=None):
-    if "كغ" in qty_or_weight or "kg" in qty_or_weight.lower():
-        # إذا تم إدخال الوزن
-        weight = float(qty_or_weight.replace("كغ", "").replace("kg", ""))
-    else:
-        # إذا كان يتم استخدام عدد القطع
-        weight = int(qty_or_weight) * (0.5 if season in ["صيفي", "صيفية"] else 1)
-
-    # تحقق من استثناءات فلسطين أولاً
-    if country == "فلسطين":
-        if area in special_cases_palestine:
-            price = special_cases_palestine[area](weight)
-            return f"السعر: {price} دينار\nالتفاصيل: {weight} كغ → {area}"
+def calculate_shipping(country, quantity, season, region=None):
+    weight = quantity * (0.5 if season in ["صيفي", "صيفية"] else 1)
 
     # تحقق من استثناءات أولاً
     if country in special_cases:
-        price = special_cases[country](weight)
+        price = special_cases[country](weight, region) if country == "فلسطين" else special_cases[country](weight)
         if isinstance(price, tuple):
             return f"السعر: {price[0]} / {price[1]} / {price[2]} دينار\nالتفاصيل: استثناء خاص ({country})"
         return f"السعر: {price} دينار\nالتفاصيل: {weight} كغ → استثناء خاص ({country})"
@@ -88,35 +77,34 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = update.message.text.strip()
         parts = text.split()
 
-        if len(parts) != 3 and len(parts) != 4:
-            await update.message.reply_text("⚠️ يرجى إدخال: فلسطين [المنطقة] [عدد القطع أو الوزن] [الموسم (صيفية/شتوية)]")
-            return
+        if len(parts) == 4 and parts[0] == "فلسطين":  # فلسطين مع المنطقة
+            raw_country, region, qty, season = parts
+            country = match_country(raw_country, list(country_zone_map.keys()) + list(special_cases.keys()))
+            if not country:
+                await update.message.reply_text("❌ الدولة غير معروفة")
+                return
+            if season not in ["صيفي", "صيفية", "شتوي", "شتوية"]:
+                await update.message.reply_text("⚠️ نوع القطع يجب أن يكون صيفي/صيفية أو شتوي/شتوية فقط")
+                return
+            quantity = int(qty)
+            response = calculate_shipping(country, quantity, season, region)
+            await update.message.reply_text(response)
 
-        raw_country, region, qty_or_weight, season = parts[:4]
+        elif len(parts) == 3:  # باقي الدول
+            raw_country, qty, season = parts
+            country = match_country(raw_country, list(country_zone_map.keys()) + list(special_cases.keys()))
+            if not country:
+                await update.message.reply_text("❌ الدولة غير معروفة")
+                return
+            if season not in ["صيفي", "صيفية", "شتوي", "شتوية"]:
+                await update.message.reply_text("⚠️ نوع القطع يجب أن يكون صيفي/صيفية أو شتوي/شتوية فقط")
+                return
+            quantity = int(qty)
+            response = calculate_shipping(country, quantity, season)
+            await update.message.reply_text(response)
 
-        # ✅ التصحيح الإملائي للموسم
-        if season in ["صيفي", "صيفية"]:
-            season = "صيفية"
-        elif season in ["شتوي", "شتوية"]:
-            season = "شتوية"
         else:
-            await update.message.reply_text("⚠️ نوع القطع يجب أن يكون صيفية أو شتوية فقط")
-            return
-
-        # ✅ المطابقة التقريبية لاسم الدولة
-        country = match_country(raw_country, list(country_zone_map.keys()) + list(special_cases.keys()))
-        if not country:
-            await update.message.reply_text("❌ الدولة غير معروفة")
-            return
-
-        # ✅ إذا كانت فلسطين يجب أن يذكر المنطقة
-        if country == "فلسطين" and region not in ["الضفة", "القدس", "الداخل"]:
-            await update.message.reply_text("⚠️ يرجى تحديد المنطقة داخل فلسطين: الضفة، القدس أو الداخل")
-            return
-
-        # ✅ التحقق إذا القيمة وزن أو عدد قطع
-        response = calculate_shipping(country, qty_or_weight, season, region)
-        await update.message.reply_text(response)
+            await update.message.reply_text("⚠️ الإدخال غير صحيح. يجب إدخال الدولة، المنطقة (فلسطين فقط)، عدد القطع، الموسم")
 
     except Exception as e:
         await update.message.reply_text(f"حدث خطأ: {e}")
