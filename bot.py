@@ -88,7 +88,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if "كغ" not in weight_part:
                 await update.message.reply_text("⚠️ الوزن يجب أن يكون مع 'كغ' مع مسافة بين الوزن وكغ.")
                 return
-            weight = float(weight_part.replace("كغ", "").strip())
+            weight = float(weight_part.replace(" ", "").replace("كغ", ""))
             country = "فلسطين"
             region = parts[1]
         else:
