@@ -1,10 +1,12 @@
 import math
+import os
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
-import os
+from rapidfuzz import process
 
-TOKEN = os.environ.get("TOKEN")
+TOKEN = os.getenv("TOKEN")
 
+# --- الأسعار حسب المنطقة ---
 zone_prices = {
     "1": (12, 5),
     "2": (12, 5),
@@ -14,6 +16,7 @@ zone_prices = {
     "A": (28, 16)
 }
 
+# --- الاستثناءات ---
 special_cases = {
     "السعودية": lambda w: (15 if w <= 0.5 else 15 + math.ceil((w - 0.5) / 0.5) * 5),
     "فلسطين": lambda w: (
@@ -27,71 +30,84 @@ special_cases = {
     "تركيا": lambda w: 30 if w <= 2 else 30 + math.ceil((w - 2) / 0.5) * 8
 }
 
-war_zone_extra = ["Iraq", "Palestine", "Libya", "Yemen", "Syria"]
+# --- دول مناطق الحرب ---
+war_zone_extra = ["العراق", "فلسطين", "ليبيا", "اليمن", "سوريا"]
 
-# اختصار: هذا مثال مصغّر من قائمة الدول
+# --- الدول بالعربي ---
 country_zone_map = {
-    "India": "2",
-    "Lebanon": "1",
-    "Syria": "1",
-    "Iraq": "3",
-    "Turkey": "3",
-    "Saudi Arabia": "2",
-    "USA": "4",
-    "Germany": "3",
-    "Jordan": "2",
-    "Morocco": "3"
+    "أفغانستان": "5", "ألبانيا": "5", "الجزائر": "A", "السعودية": "2",
+    "الهند": "2", "باكستان": "2", "فلسطين": "1", "سوريا": "1", "لبنان": "1",
+    "العراق": "3", "تركيا": "3", "مصر": "2", "الأردن": "2", "تونس": "A", "المغرب": "3",
+    "الإمارات": "2", "قطر": "2", "الكويت": "2", "البحرين": "2", "عمان": "2", "اليمن": "3",
+    "ليبيا": "5", "السودان": "3", "الصومال": "5", "فرنسا": "3", "ألمانيا": "3",
+    "أمريكا": "4", "كندا": "4", "بريطانيا": "3", "إيطاليا": "3", "إسبانيا": "5",
+    "الصين": "4", "اليابان": "5", "كوريا الجنوبية": "5", "أستراليا": "4", "نيوزيلندا": "4"
+    # يمكن إضافة باقي الدول حسب الحاجة
 }
 
-def calculate_shipping(country: str, quantity: int, season: str) -> str:
-    weight_per_piece = 0.5 if season == "صيفية" else 1
-    total_weight = quantity * weight_per_piece
-    total_weight = math.ceil(total_weight * 2) / 2
+# --- دالة مطابقة تقريبية للاسم ---
+def match_country(user_input, countries):
+    user_input = user_input.replace("ه", "ة")  # تصحيح الهاء ↔ التاء المربوطة
+    result = process.extractOne(user_input, countries)
+    return result[0] if result and result[1] >= 80 else None
 
+# --- دالة الحساب ---
+def calculate_shipping(country, quantity, season):
+    weight = quantity * (0.5 if season == "صيفية" else 1)
+
+    # تحقق من استثناءات أولاً
     if country in special_cases:
-        if country == "فلسطين":
-            prices = special_cases[country](total_weight)
-            return f"السعر: {prices[0]} دينار / التفاصيل: {total_weight} كغ → فلسطين - الضفة → {prices[0]}"
-        price = special_cases[country](total_weight)
-        return f"السعر: {price} دينار / التفاصيل: {total_weight} كغ → {country} (استثناء)"
+        price = special_cases[country](weight)
+        if isinstance(price, tuple):
+            return f"السعر: {price[0]} / {price[1]} / {price[2]} دينار\nالتفاصيل: استثناء خاص ({country})"
+        return f"السعر: {price} دينار\nالتفاصيل: {weight} كغ → استثناء خاص ({country})"
 
+    # منطقة الدولة
     zone = country_zone_map.get(country)
     if not zone:
-        return "❌ الدولة غير مدرجة. تأكد من الإملاء أو التواصل مع الدعم."
+        return "❌ الدولة غير مدرجة في قائمة الشحن"
 
     base, extra = zone_prices[zone]
-    if total_weight <= 0.5:
-        price = base
-        additions = 0
+    if weight <= 0.5:
+        total = base
     else:
-        additional = math.ceil((total_weight - 0.5) / 0.5)
-        additions = additional * extra
-        price = base + additions
+        total = base + math.ceil((weight - 0.5) / 0.5) * extra
 
-    if "(W)" in country or country in war_zone_extra:
-        if country not in ["سوريا", "لبنان", "العراق", "تركيا"]:
-            price += 15
-            return f"السعر: {price} دينار / التفاصيل: {total_weight} كغ → المنطقة {zone} → {base} + {additions} + 15 (رسوم حرب)"
+    if country in war_zone_extra and country not in ["فلسطين", "سوريا", "لبنان", "العراق", "تركيا"]:
+        total += 15
+        return f"السعر: {total} دينار\nالتفاصيل: {weight} كغ → المنطقة {zone} → {base} + إضافات حرب + وزن إضافي"
 
-    return f"السعر: {price} دينار / التفاصيل: {total_weight} كغ → المنطقة {zone} → {base} + {additions}"
+    return f"السعر: {total} دينار\nالتفاصيل: {weight} كغ → المنطقة {zone} → {base} + وزن إضافي"
 
+# --- الرد على الرسائل ---
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
     try:
+        text = update.message.text.strip()
         parts = text.split()
+
         if len(parts) != 3:
-            await update.message.reply_text("⚠️ الرجاء إرسال الرسالة بالشكل التالي: اسم الدولة عدد_القطع نوعها (صيفية/شتوية)")
+            await update.message.reply_text("⚠️ يرجى إدخال: الدولة عدد القطع الموسم (صيفية/شتوية)")
             return
-        country, qty, season = parts
-        quantity = int(qty)
+
+        raw_country, qty, season = parts
+        country = match_country(raw_country, list(country_zone_map.keys()) + list(special_cases.keys()))
+
+        if not country:
+            await update.message.reply_text("❌ الدولة غير معروفة")
+            return
+
         if season not in ["صيفية", "شتوية"]:
             await update.message.reply_text("⚠️ نوع القطع يجب أن يكون صيفية أو شتوية فقط")
             return
+
+        quantity = int(qty)
         response = calculate_shipping(country, quantity, season)
         await update.message.reply_text(response)
+
     except Exception as e:
         await update.message.reply_text(f"حدث خطأ: {e}")
 
+# --- تشغيل البوت ---
 app = ApplicationBuilder().token(TOKEN).build()
 app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
