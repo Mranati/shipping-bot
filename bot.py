@@ -31,23 +31,36 @@ special_cases = {
     "تركيا": lambda w: 30 + math.ceil((w - 2) / 0.5) * 5 if w > 2 else 30
 }
 
+# --- تحويل الأرقام العربية إلى إنجليزية ---
+def convert_arabic_numerals(text):
+    return text.translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))
+
+# --- مطابقة تقريبية للدول ---
 def match_country(user_input, countries):
     user_input = user_input.replace("ه", "ة")
     result = process.extractOne(user_input, countries)
     return result[0] if result and result[1] >= 80 else None
 
-def calculate_shipping(country, quantity, region=None):
-    weight = quantity
+# --- استخراج الوزن من قطع ونوع ---
+def get_weight_from_pieces(pieces: int, type_: str) -> float:
+    if "صيف" in type_:
+        return pieces * 0.3
+    elif "شت" in type_:
+        return pieces * 0.5
+    else:
+        return -1  # نوع غير معروف
 
+# --- حساب السعر ---
+def calculate_shipping(country, weight, region=None):
     if country == "فلسطين" and region:
         price = special_cases["فلسطين"](weight, region)
         if price == "منطقة غير صحيحة":
             return "⚠️ المنطقة غير صحيحة. يرجى اختيار (الضفة، القدس، الداخل)"
-        return f"السعر: {price} دينار\nالتفاصيل: {weight} كغ → استثناء خاص ({country} - {region})"
+        return f"السعر: {price} دينار\nالتفاصيل: {weight:.1f} كغ → استثناء خاص ({country} - {region})"
 
     if country in special_cases:
         price = special_cases[country](weight)
-        return f"السعر: {price} دينار\nالتفاصيل: {weight} كغ → استثناء خاص ({country})"
+        return f"السعر: {price} دينار\nالتفاصيل: {weight:.1f} كغ → استثناء خاص ({country})"
 
     zone = country_zone_map.get(country)
     if not zone:
@@ -64,42 +77,61 @@ def calculate_shipping(country, quantity, region=None):
         total = base + extra_cost
         breakdown = f"{base} (أساسي) + {extra_cost} (وزن إضافي: {extra_units} × {extra})"
 
-    return f"السعر: {total} دينار\nالتفاصيل: {weight} كغ → المنطقة {zone} → {breakdown}"
+    return f"السعر: {total} دينار\nالتفاصيل: {weight:.1f} كغ → المنطقة {zone} → {breakdown}"
 
+# --- الرد على الرسائل ---
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
-        text = update.message.text.strip()
+        text = update.message.text.strip().replace("ه", "ة")
         parts = text.split()
 
         if len(parts) < 2:
-            await update.message.reply_text("⚠️ يرجى إدخال: الدولة (أو فلسطين المنطقة) الوزن مع وحدة 'كغ'")
+            await update.message.reply_text("⚠️ يرجى كتابة: الدولة [الوزن كغ] أو الدولة [عدد القطع] [صيفي/شتوي]")
             return
 
         if "فلسطين" in parts[0]:
             if len(parts) < 3:
-                await update.message.reply_text("⚠️ يرجى كتابة: فلسطين [المنطقة] [الوزن كغ]")
+                await update.message.reply_text("⚠️ يرجى كتابة: فلسطين [المنطقة] [الوزن أو عدد القطع]")
                 return
             country = "فلسطين"
             region = parts[1]
-            weight_str = " ".join(parts[2:])
+            remaining = parts[2:]
         else:
             country = parts[0]
             region = None
-            weight_str = " ".join(parts[1:])
+            remaining = parts[1:]
 
-        # معالجة الوزن
-        weight_str = weight_str.replace(" ", "").replace("كغ", "")
+        # دمج الباقي وتحويل الأرقام العربية
+        rest_text = convert_arabic_numerals(" ".join(remaining)).replace("كغ", "").replace(" ", "")
+
+        # 1. محاولة قراءة الوزن مباشرة
         try:
-            weight = float(weight_str)
-        except:
-            await update.message.reply_text("⚠️ الوزن غير صالح. يرجى التأكد من كتابة الرقم مع 'كغ'")
-            return
+            weight = float(rest_text)
+        except ValueError:
+            # 2. محاولة استخراج من "عدد القطع + نوع"
+            if "قطع" in text or "قطعة" in text:
+                try:
+                    # مثال: 3 قطع صيفي
+                    for i, word in enumerate(remaining):
+                        if "قطع" in word or "قطعة" in word:
+                            count = int(convert_arabic_numerals(remaining[i - 1]))
+                            type_ = " ".join(remaining[i + 1:])  # بعد "قطع"
+                            weight = get_weight_from_pieces(count, type_)
+                            if weight == -1:
+                                raise ValueError("نوع القطع غير معروف")
+                            break
+                except:
+                    await update.message.reply_text("⚠️ لم أتمكن من فهم عدد القطع أو نوعها (صيفي / شتوي).")
+                    return
+            else:
+                await update.message.reply_text("⚠️ لم أتمكن من فهم الوزن أو عدد القطع.")
+                return
 
         response = calculate_shipping(country, weight, region if country == "فلسطين" else None)
         await update.message.reply_text(response)
 
     except Exception as e:
-        await update.message.reply_text(f"حدث خطأ: {e}")
+        await update.message.reply_text(f"حدث خطأ غير متوقع: {e}")
 
 # --- تشغيل Webhook ---
 if __name__ == '__main__':
