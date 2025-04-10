@@ -4,7 +4,7 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 from rapidfuzz import process
 
-# استيراد قائمة الدول من الملف الخارجي
+# استيراد قائمة الدول من ملف خارجي
 from country_zone_map_full import country_zone_map
 
 TOKEN = os.getenv("TOKEN")
@@ -26,7 +26,7 @@ special_cases_palestine = {
     "الداخل": lambda w: 20 + math.ceil((w - 2) / 0.5) * 5 if w > 2 else 20
 }
 
-# --- استثناءات الدول الأخرى ---
+# --- استثناءات أخرى ---
 special_cases = {
     "السعودية": lambda w: 15 + math.ceil((w - 0.5) / 0.5) * 5 if w > 0.5 else 15,
     "فلسطين": lambda w, region: special_cases_palestine.get(region, lambda w: "منطقة غير صحيحة")(w),
@@ -36,29 +36,26 @@ special_cases = {
     "تركيا": lambda w: 30 + math.ceil((w - 2) / 0.5) * 5 if w > 2 else 30
 }
 
-# --- دالة مطابقة تقريبية للاسم ---
+# --- مطابقة الدول تقريبياً ---
 def match_country(user_input, countries):
     user_input = user_input.replace("ه", "ة")
     result = process.extractOne(user_input, countries)
     return result[0] if result and result[1] >= 80 else None
 
-# --- دالة حساب السعر (معدّلة) ---
+# --- حساب السعر ---
 def calculate_shipping(country, quantity, region=None):
     weight = quantity
 
-    # التحقق من استثناءات فلسطين
     if country == "فلسطين" and region:
         price = special_cases["فلسطين"](weight, region)
         if price == "منطقة غير صحيحة":
             return "⚠️ المنطقة غير صحيحة. يرجى اختيار (الضفة، القدس، الداخل)"
         return f"السعر: {price} دينار\nالتفاصيل: {weight} كغ → استثناء خاص ({country} - {region})"
 
-    # التحقق من استثناءات الدول الأخرى
     if country in special_cases:
         price = special_cases[country](weight)
         return f"السعر: {price} دينار\nالتفاصيل: {weight} كغ → استثناء خاص ({country})"
 
-    # تحديد المنطقة
     zone = country_zone_map.get(country)
     if not zone:
         return "❌ الدولة غير مدرجة في قائمة الشحن"
@@ -82,11 +79,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = update.message.text.strip()
         parts = text.split()
 
-        if len(parts) < 3:
+        if len(parts) < 2:
             await update.message.reply_text("⚠️ يرجى إدخال: الدولة (أو فلسطين المنطقة) الوزن مع وحدة 'كغ'")
             return
-        
-        # التحقق إذا كانت المدخلات تخص فلسطين
+
         if "فلسطين" in parts[0]:
             weight_part = parts[2]
             if "كغ" not in weight_part:
@@ -110,16 +106,15 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"حدث خطأ: {e}")
 
-# --- تشغيل البوت ---
-app = ApplicationBuilder().token(TOKEN).build()
-app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
+# --- تشغيل البوت باستخدام Webhook ---
 if __name__ == '__main__':
-    import sys
-
+    from telegram.ext import Application
     print("🚀 البوت يعمل باستخدام Webhook")
 
-    port = int(os.environ.get('PORT', 8443))
+    port = int(os.environ.get("PORT", 8443))
+    app = ApplicationBuilder().token(TOKEN).build()
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
     app.run_webhook(
         listen="0.0.0.0",
         port=port,
