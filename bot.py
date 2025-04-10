@@ -36,46 +36,47 @@ special_cases = {
     "تركيا": lambda w: 30 + math.ceil((w - 2) / 0.5) * 5 if w > 2 else 30
 }
 
-# --- دول أخرى ---
-country_zone_map = country_zone_map  # استيراد قائمة البلدان من الملف الخارجي
-
 # --- دالة مطابقة تقريبية للاسم ---
 def match_country(user_input, countries):
-    user_input = user_input.replace("ه", "ة")  # تصحيح الهاء ↔ التاء المربوطة
+    user_input = user_input.replace("ه", "ة")
     result = process.extractOne(user_input, countries)
     return result[0] if result and result[1] >= 80 else None
 
-# --- دالة حساب السعر ---
+# --- دالة حساب السعر (معدّلة) ---
 def calculate_shipping(country, quantity, region=None):
-    weight = quantity  # الوزن يتم تحديده مباشرة من المدخلات بدون الحاجة للموسم أو القطع
+    weight = quantity
 
     # التحقق من استثناءات فلسطين
     if country == "فلسطين" and region:
-        # حساب السعر بناءً على المنطقة فقط
         price = special_cases["فلسطين"](weight, region)
         if price == "منطقة غير صحيحة":
             return "⚠️ المنطقة غير صحيحة. يرجى اختيار (الضفة، القدس، الداخل)"
         return f"السعر: {price} دينار\nالتفاصيل: {weight} كغ → استثناء خاص ({country} - {region})"
-    
+
     # التحقق من استثناءات الدول الأخرى
     if country in special_cases:
         price = special_cases[country](weight)
         return f"السعر: {price} دينار\nالتفاصيل: {weight} كغ → استثناء خاص ({country})"
 
-    # منطقة الدولة (في حالة الدول العادية)
+    # تحديد المنطقة
     zone = country_zone_map.get(country)
     if not zone:
         return "❌ الدولة غير مدرجة في قائمة الشحن"
 
     base, extra = zone_prices[zone]
+
     if weight <= 0.5:
         total = base
+        breakdown = f"{base} (حتى 0.5 كغ)"
     else:
-        total = base + math.ceil((weight - 0.5) / 0.5) * extra
+        extra_units = math.ceil((weight - 0.5) / 0.5)
+        extra_cost = extra_units * extra
+        total = base + extra_cost
+        breakdown = f"{base} + {extra_cost} (وزن إضافي: {extra_units} × {extra})"
 
-    return f"السعر: {total} دينار\nالتفاصيل: {weight} كغ → المنطقة {zone} → {base} + وزن إضافي"
+    return f"السعر: {total} دينار\nالتفاصيل: {weight} كغ → المنطقة {zone} → {breakdown}"
 
-# --- الرد على الرسائل ---  
+# --- الرد على الرسائل ---
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         text = update.message.text.strip()
@@ -87,7 +88,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # التحقق إذا كانت المدخلات تخص فلسطين
         if "فلسطين" in parts[0]:
-            # التعامل مع فلسطين مع مسافة بين الوزن وكغ
             weight_part = parts[2]
             if "كغ" not in weight_part:
                 await update.message.reply_text("⚠️ الوزن يجب أن يكون مع 'كغ' مع مسافة بين الوزن وكغ.")
@@ -96,7 +96,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             country = "فلسطين"
             region = parts[1]
         else:
-            # التعامل مع باقي الدول مع مسافة بين الوزن وكغ
             country = parts[0]
             region = None
             weight_part = parts[1]
@@ -105,7 +104,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
             weight = float(weight_part.replace("كغ", "").strip())
 
-        # حساب السعر بناءً على المدخلات
         response = calculate_shipping(country, weight, region if country == "فلسطين" else None)
         await update.message.reply_text(response)
 
