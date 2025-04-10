@@ -53,8 +53,9 @@ def calculate_shipping(country, qty_or_weight, season, area=None):
     # تحقق من استثناءات أولاً
     if country in special_cases:
         if country == "فلسطين":
+            # إذا كانت فلسطين، نحدد المنطقة في السعر
             price = special_cases[country](weight, area)
-            return f"السعر: {price[0]} / {price[1]} / {price[2]} دينار\nالتفاصيل: استثناء خاص ({country})"
+            return f"السعر: {price[0]} دينار\nالتفاصيل: {weight} كغ → استثناء خاص ({country} - {area})"
         else:
             price = special_cases[country](weight)
             if isinstance(price, tuple):
@@ -85,7 +86,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parts = text.split()
 
         if len(parts) != 3 and len(parts) != 4:
-            await update.message.reply_text("⚠️ يرجى إدخال: الدولة عدد القطع أو الوزن الموسم (صيفية/شتوية) المنطقة (فلسطين فقط)")
+            await update.message.reply_text("⚠️ يرجى إدخال: فلسطين [المنطقة] [عدد القطع أو الوزن] [الموسم (صيفية/شتوية)]")
             return
 
         raw_country, qty_or_weight, season = parts[:3]
