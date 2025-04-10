@@ -51,7 +51,7 @@ def calculate_shipping(country, quantity, season, region=None):
         price = special_cases[country](weight, region)
         return f"السعر: {price} دينار\nالتفاصيل: {weight} كغ → استثناء خاص ({country} - {region})"
 
-    # تحقق من استثناءات أولاً
+    # تحقق من استثناءات أولاً لبقية الدول
     if country in special_cases:
         price = special_cases[country](weight)
         return f"السعر: {price} دينار\nالتفاصيل: {weight} كغ → استثناء خاص ({country})"
@@ -73,7 +73,7 @@ def calculate_shipping(country, quantity, season, region=None):
 
     return f"السعر: {total} دينار\nالتفاصيل: {weight} كغ → المنطقة {zone} → {base} + وزن إضافي"
 
-# --- الرد على الرسائل ---  
+# --- الرد على الرسائل ---
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         text = update.message.text.strip()
@@ -84,7 +84,16 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         raw_country, region, qty, season = parts
-        country = match_country(raw_country, list(country_zone_map.keys()) + list(special_cases.keys()))
+
+        # إذا كانت الدولة فلسطين
+        if "فلسطين" in raw_country:
+            country = "فلسطين"
+            region = region  # تحديد المنطقة (الضفة، القدس، الداخل)
+            quantity = float(qty)  # استخدام الوزن بدلًا من عدد القطع
+        else:
+            country = match_country(raw_country, list(country_zone_map.keys()) + list(special_cases.keys()))
+            region = None  # باقي الدول لا يحتاجون إلى منطقة
+            quantity = int(qty)
 
         if not country:
             await update.message.reply_text("❌ الدولة غير معروفة")
@@ -94,7 +103,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ نوع القطع يجب أن يكون صيفي/صيفية أو شتوي/شتوية فقط")
             return
 
-        quantity = int(qty)
         response = calculate_shipping(country, quantity, season, region if country == "فلسطين" else None)
         await update.message.reply_text(response)
 
