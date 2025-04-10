@@ -89,15 +89,19 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ يرجى كتابة: الدولة [الوزن كغ] أو [عدد] [صيفي/شتوي]")
             return
 
-        if "فلسطين" in parts[0]:
+        country_input = parts[0]
+        country = match_country(country_input, list(country_zone_map.keys()) + list(special_cases.keys()))
+        if not country:
+            await update.message.reply_text("❌ الدولة غير مدرجة في قائمة الشحن")
+            return
+
+        if country == "فلسطين":
             if len(parts) < 3:
                 await update.message.reply_text("⚠️ يرجى كتابة: فلسطين [المنطقة] [الوزن أو عدد القطع]")
                 return
-            country = "فلسطين"
             region = parts[1]
             remaining = parts[2:]
         else:
-            country = parts[0]
             region = None
             remaining = parts[1:]
 
@@ -108,7 +112,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             weight = float(rest.replace(" ", ""))
         except:
             # محاولة فهم (عدد + نوع) بدون الحاجة لكلمة "قطع"
-            numbers = [word for word in remaining if word.isdigit() or word in "٠١٢٣٤٥٦٧٨٩"]
+            numbers = [word for word in remaining if word.isdigit() or any(c in "٠١٢٣٤٥٦٧٨٩" for c in word)]
             types = [word for word in remaining if "صيف" in word or "شت" in word]
 
             if numbers and types:
@@ -127,7 +131,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         await update.message.reply_text(f"حدث خطأ غير متوقع: {e}")
 
-# --- Webhook على Render ---
+# --- Webhook لـ Render ---
 if __name__ == '__main__':
     from telegram.ext import Application
     print("🚀 البوت يعمل باستخدام Webhook")
