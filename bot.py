@@ -32,7 +32,8 @@ special_cases = {
 # --- دول مناطق الحرب ---
 war_zone_extra = ["العراق", "فلسطين", "ليبيا", "اليمن", "سوريا"]
 
-from country_zone_map_full import country_zone_map
+# --- الدول العادية --- 
+normal_countries = list(country_zone_map.keys())
 
 # --- دالة مطابقة تقريبية للاسم ---
 def match_country(user_input, countries):
@@ -44,15 +45,16 @@ def match_country(user_input, countries):
 def calculate_shipping(country, quantity, season, region=None):
     weight = quantity * (0.5 if season == "صيفية" or season == "صيفي" else 1)
 
-    # تحقق من استثناءات فلسطين أولاً
-    if country == "فلسطين":
-        if region not in ["الضفة", "القدس", "الداخل"]:
-            return "⚠️ المنطقة غير صحيحة. يرجى اختيار (الضفة، القدس، الداخل)"
-        price = special_cases[country](weight, region)
-        return f"السعر: {price} دينار\nالتفاصيل: {weight} كغ → استثناء خاص ({country} - {region})"
-
-    # تحقق من استثناءات أولاً لبقية الدول
+    # تحقق من استثناءات أولاً
     if country in special_cases:
+        # إذا كانت فلسطين، نتأكد من المنطقة
+        if country == "فلسطين":
+            if region not in ["الضفة", "القدس", "الداخل"]:
+                return "⚠️ المنطقة غير صحيحة. يرجى اختيار (الضفة، القدس، الداخل)"
+            price = special_cases[country](weight, region)
+            return f"السعر: {price} دينار\nالتفاصيل: {weight} كغ → استثناء خاص ({country} - {region})"
+        
+        # لحساب الأسعار لبقية الدول الاستثنائية
         price = special_cases[country](weight)
         return f"السعر: {price} دينار\nالتفاصيل: {weight} كغ → استثناء خاص ({country})"
 
@@ -73,7 +75,7 @@ def calculate_shipping(country, quantity, season, region=None):
 
     return f"السعر: {total} دينار\nالتفاصيل: {weight} كغ → المنطقة {zone} → {base} + وزن إضافي"
 
-# --- الرد على الرسائل ---
+# --- الرد على الرسائل ---  
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         text = update.message.text.strip()
