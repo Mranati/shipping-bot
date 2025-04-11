@@ -84,14 +84,6 @@ def extract_weight_from_text(text: str):
             detail_parts.append(f"{count} شتوي = {w} كغ")
     return total_weight, " + ".join(detail_parts)
 
-def get_weight_from_pieces(pieces: int, type_: str) -> float:
-    if "صيف" in type_:
-        return pieces * 0.5
-    elif "شت" in type_:
-        return pieces * 1.0
-    else:
-        return -1
-
 def match_country(user_input, countries):
     user_input = user_input.replace("ه", "ة")
     if user_input in country_aliases:
@@ -153,15 +145,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if weight == 0:
             await update.message.reply_text("⚠️ لم أتمكن من حساب الوزن من المدخلات.")
             return
-        response = calculate_shipping(country, weight, region if country == "فلسطين" else None)
-                summary = calculate_shipping(country, weight, region if country == "فلسطين" else None)
+        summary = calculate_shipping(country, weight, region if country == "فلسطين" else None)
         if details:
             price_line, *rest = summary.splitlines()
             response = f"{price_line}\n{details}\n\n" + "\n".join(rest)
         else:
             response = summary
-
-
         await update.message.reply_text(response)
     except Exception as e:
         await update.message.reply_text(f"حدث خطأ غير متوقع: {e}")
