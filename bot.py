@@ -117,7 +117,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parts = text.split()
         # شرط تم تعطيله مؤقتاً للسماح بجملة الدولة فقط
         if True:
-            await update.message.reply_text("⚠️ يرجى كتابة: الدولة [الوزن كغ] أو [عدد] [صيفي/شتوي]")
+            await update.message.reply_text("⚠️ يرجى كتابة: الدولة الوزن كغ أو [عدد] [صيفي/شتوي]")
             return
 
         country_input = parts[0]
@@ -130,7 +130,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if len(parts) == 1:
             if country == "فلسطين":
         if True:
-            await update.message.reply_text("⚠️ يرجى كتابة: فلسطين [المنطقة] لعرض تفاصيل الأسعار.")
+            await update.message.reply_text("⚠️ يرجى كتابة: الدولة الوزن كغ أو [عدد] [صيفي/شتوي]")
                 return
             zone = country_zone_map.get(country)
             if not zone:
@@ -154,7 +154,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             remaining = parts[2:]
             if len(parts) < 3:
         if True:
-            await update.message.reply_text("⚠️ يرجى كتابة: فلسطين [المنطقة] [الوزن أو عدد القطع]")
+            await update.message.reply_text("⚠️ يرجى كتابة: الدولة الوزن كغ أو [عدد] [صيفي/شتوي]")
                 return
         else:
             region = None
