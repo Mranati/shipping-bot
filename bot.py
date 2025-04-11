@@ -52,22 +52,17 @@ def convert_arabic_numerals(text):
     return text.translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))
 
 def extract_weight_from_text(text: str):
-    text = convert_arabic_numerals(text)
-    import re
-    matches = re.findall(r'(\d+)\s*(صيفي(?:ة)?|شتوي(?:ة)?)', text)
-    total_weight = 0
+    matches = re.findall(r'(\d+)\s*(صيفي|شتوي)', text)
+    total_weight = 0.0
     detail_parts = []
     for count, type_ in matches:
-    count = int(count)
-    if "صيف" in type_:
-    w = count * 0.5
-    total_weight += w
-    detail_parts.append(f"{count} صيفي = {w} كغ")
-    elif "شت" in type_:
-    w = count * 1.0
-    total_weight += w
-    detail_parts.append(f"{count} شتوي = {w} كغ")
-    return total_weight, " + ".join(detail_parts)
+        count = int(count)
+        if type_ == 'صيفي':
+            total_weight += count * 0.5
+        elif type_ == 'شتوي':
+            total_weight += count * 1.0
+        detail_parts.append(f'{count} {type_}')
+    return total_weight, ' + '.join(detail_parts)
 
 def match_country(user_input, countries):
     user_input = user_input.replace("ه", "ة").strip()
