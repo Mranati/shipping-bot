@@ -113,7 +113,7 @@ def build_all_currency_buttons():
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = update.message.text.strip().replace("ه", "ة")
-    try:
+        try:
         parts = text.split()
         
         # --- تسعيرة الدولة فقط بدون وزن ---
@@ -149,7 +149,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 await update.message.reply_text(response, reply_markup=build_currency_buttons(matched_country))
                 return
         
-        text = update.message.text.strip().replace("ه", "ة")
         parts = text.split()
         
         # --- تسعيرة الدولة فقط بدون وزن ---
@@ -195,7 +194,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         weight = 0
         details = ""
 
-        try:
             weight = float(convert_arabic_numerals(rest_text.replace("كغ", "").strip()))
         except:
             weight, details = extract_weight_from_text(rest_text)
