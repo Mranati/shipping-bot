@@ -1,114 +1,29 @@
-
 import os
-import math
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ApplicationBuilder, MessageHandler, CallbackQueryHandler, filters, ContextTypes
-from rapidfuzz import process
+from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes, CallbackQueryHandler
+
 from country_zone_map_full import country_zone_map, country_aliases, zone_prices, special_cases, special_cases_palestine, exchange_rates
+from shipping_logic import match_country, convert_arabic_numerals, extract_weight_from_text, calculate_shipping
 
-# --- إعدادات عامة ---
+TOKEN = os.getenv("TOKEN")
 last_prices = {}
-last_countries = {}
 
-# أسماء العملات بالعربي
-currency_names = {
-    "USD": "دولار أمريكي",
-    "SAR": "ريال سعودي",
-    "AED": "درهم إماراتي",
-    "QAR": "ريال قطري",
-    "KWD": "دينار كويتي",
-    "OMR": "ريال عماني",
-    "BHD": "دينار بحريني",
-    "LYD": "دينار ليبي",
-    "IQD": "دينار عراقي",
-    "ILS": "شيكل",
-    "CAD": "دولار كندي",
-    "AUD": "دولار أسترالي",
-    "EUR": "يورو",
-    "GBP": "جنيه إسترليني"
-}
-
-# ربط الدولة بعملتها الأساسية
-country_to_currency = {
-    "السعودية": "SAR",
-    "الإمارات العربية المتحدة": "AED",
-    "قطر": "QAR",
-    "الكويت": "KWD",
-    "البحرين": "BHD",
-    "عمان": "OMR",
-    "العراق": "IQD",
-    "ليبيا": "LYD",
-    "فلسطين": "ILS",
-    "الأردن": "JOD",
-    "كندا": "CAD",
-    "أستراليا": "AUD",
-    "الولايات المتحدة": "USD",
-    "المملكة المتحدة": "GBP",
-    "ألمانيا": "EUR",
-    "فرنسا": "EUR"
-}
-
-def convert_arabic_numerals(text):
-    return text.translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))
-
-def extract_weight_from_text(text: str):
-    text = convert_arabic_numerals(text)
-    import re
-    matches = re.findall(r'(\d+)\s*(صيفي(?:ة)?|شتوي(?:ة)?)', text)
-    total_weight = 0
-    detail_parts = []
-    for count, type_ in matches:
-        count = int(count)
-        if "صيف" in type_:
-            w = count * 0.5
-            total_weight += w
-            detail_parts.append(f"{count} صيفي = {w} كغ")
-        elif "شت" in type_:
-            w = count * 1.0
-            total_weight += w
-            detail_parts.append(f"{count} شتوي = {w} كغ")
-    return total_weight, " + ".join(detail_parts)
-
-def match_country(user_input, countries):
-    user_input = user_input.replace("ه", "ة").strip()
-    if user_input in country_aliases:
-        return country_aliases[user_input]
-    result = process.extractOne(user_input, countries)
-    return result[0] if result and result[1] >= 80 else None
-
-def calculate_shipping(country, weight, region=None):
-    if country == "فلسطين" and region:
-        price = special_cases["فلسطين"](weight, region)
-        if price == "منطقة غير صحيحة":
-            return "⚠️ المنطقة غير صحيحة. يرجى اختيار (الضفة، القدس، الداخل)", None
-        return f"السعر: {price} دينار\nالتفاصيل: {weight:.1f} كغ → استثناء خاص ({country} - {region})", price
-    if country in special_cases:
-        price = special_cases[country](weight)
-        return f"السعر: {price} دينار\nالتفاصيل: {weight:.1f} كغ → استثناء خاص ({country})", price
-    zone = country_zone_map.get(country)
-    if not zone:
-        return "❌ الدولة غير مدرجة في قائمة الشحن", None
-    base, extra = zone_prices[zone]
-    if weight <= 0.5:
-        total = base
-    else:
-        total = base + math.ceil((weight - 0.5) / 0.5) * extra
-    return f"السعر: {total} دينار\nالتفاصيل: {weight:.1f} كغ → المنطقة {zone}", total
-
-def build_currency_buttons(country):
+def build_currency_keyboard(preferred=None):
     buttons = []
-    buttons.append(InlineKeyboardButton("💵 التحويل لـ دولار أمريكي", callback_data="USD"))
-    code = country_to_currency.get(country)
-    if code and code != "USD":
-        name = currency_names.get(code, code)
-        buttons.append(InlineKeyboardButton(f"💱 التحويل لـ {name}", callback_data=code))
-    buttons.append(InlineKeyboardButton("🌍 خيارات أخرى", callback_data="show_more"))
-    return InlineKeyboardMarkup.from_row(buttons)
+    buttons.append([InlineKeyboardButton("💲 التحويل لـ دولار أمريكي", callback_data="USD")])
 
-def build_all_currency_buttons():
+    if preferred and preferred != "USD":
+        buttons.append([InlineKeyboardButton(f"💱 التحويل لـ {preferred}", callback_data=preferred)])
+
+    buttons.append([InlineKeyboardButton("🌍 خيارات أخرى", callback_data="more_currencies")])
+    return InlineKeyboardMarkup(buttons)
+
+def build_more_currencies_keyboard():
     buttons = []
-    for code, name in currency_names.items():
-        buttons.append([InlineKeyboardButton(f"💱 التحويل لـ {name}", callback_data=f"conv_{code}")])
+    for code, name in exchange_rates.items():
+        if code != "USD":
+            buttons.append([InlineKeyboardButton(f"💱 التحويل لـ {name}", callback_data=code)])
+    buttons.append([InlineKeyboardButton("🔙 رجوع", callback_data="back_to_main")])
     return InlineKeyboardMarkup(buttons)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -155,49 +70,76 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if details:
             price_line, *rest = summary.splitlines()
-            response = f"{price_line}\n{details}\n\n" + "\n".join(rest)
+            response = f"{price_line}
+{details}
+
+" + "
+".join(rest)
         else:
             response = summary
 
-        user_id = update.effective_user.id
-        last_prices[user_id] = price
-        last_countries[user_id] = country
-        await update.message.reply_text(response, reply_markup=build_currency_buttons(country))
+        last_prices[update.effective_user.id] = price
 
+        currency_hint = {
+            "السعودية": "SAR",
+            "الإمارات": "AED",
+            "قطر": "QAR",
+            "الكويت": "KWD",
+            "البحرين": "BHD",
+            "عمان": "OMR",
+            "العراق": "IQD",
+            "فلسطين": "ILS",
+            "ليبيا": "LYD",
+            "أمريكا": "USD",
+            "كندا": "CAD",
+            "استراليا": "AUD",
+            "بريطانيا": "GBP",
+            "انجلترا": "GBP",
+            "ألمانيا": "EUR",
+            "فرنسا": "EUR",
+        }
+        preferred_currency = currency_hint.get(country)
+
+        await update.message.reply_text(response, reply_markup=build_currency_keyboard(preferred_currency))
     except Exception as e:
-        await update.message.reply_text(f"حدث خطأ غير متوقع: {e}")
+        await update.message.reply_text(f"⚠️ حدث خطأ غير متوقع: {e}")
 
 async def handle_currency_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
+    try:
+        query = update.callback_query
+        await query.answer()
+        user_id = query.from_user.id
+        currency_code = query.data
 
-    if query.data == "show_more":
-        await query.edit_message_reply_markup(reply_markup=build_all_currency_buttons())
-        return
+        if currency_code == "more_currencies":
+            await query.edit_message_reply_markup(reply_markup=build_more_currencies_keyboard())
+            return
+        elif currency_code == "back_to_main":
+            preferred = None
+            for name, code in exchange_rates.items():
+                if code == "USD":
+                    continue
+                if user_id in last_prices:
+                    preferred = code
+            await query.edit_message_reply_markup(reply_markup=build_currency_keyboard(preferred))
+            return
 
-    currency_code = query.data.replace("conv_", "") if query.data.startswith("conv_") else query.data
-    price_jod = last_prices.get(user_id)
-    if not price_jod:
-        await query.edit_message_text("❗️ لم يتم تحديد أي سعر للتحويل.")
-        return
+        if user_id not in last_prices:
+            await query.edit_message_text("❗️ لم يتم تحديد أي سعر للتحويل.")
+            return
 
-    rate = exchange_rates.get(currency_code)
-    if not rate:
-        await query.edit_message_text("❌ العملة غير مدعومة.")
-        return
-
-    rate_with_margin = round(rate * 1.07, 4)
-    converted = round(price_jod * rate_with_margin, 2)
-    currency_name = currency_names.get(currency_code, currency_code)
-
-    await query.edit_message_text(
-        f"💱 السعر المحوّل:\n{price_jod} دينار أردني ≈ {converted} {currency_name}\n"
-        f"🧮 (1 دينار = {rate_with_margin} {currency_name} بعد إضافة 7%)"
-    )
+        price_jod = last_prices[user_id]
+        rate = exchange_rates.get(currency_code)
+        converted = round(price_jod * rate, 2)
+        await query.edit_message_text(
+            f"💱 السعر المحوّل:
+{price_jod} دينار أردني ≈ {converted} {currency_code}
+🧮 (1 دينار = {rate} {currency_code})"
+        )
+    except Exception as e:
+        await update.callback_query.message.reply_text(f"⚠️ حدث خطأ أثناء التحويل: {e}")
 
 if __name__ == '__main__':
-    TOKEN = os.getenv("TOKEN")
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CallbackQueryHandler(handle_currency_selection))
@@ -205,48 +147,4 @@ if __name__ == '__main__':
         listen="0.0.0.0",
         port=int(os.environ.get("PORT", 8443)),
         webhook_url=f"https://{os.environ['RENDER_EXTERNAL_HOSTNAME']}/"
-    )
-
-
-def build_all_currency_buttons():
-    buttons = []
-    for code, name in currency_names.items():
-        buttons.append([InlineKeyboardButton(f"💱 التحويل لـ {name}", callback_data=f"conv_{code}")])
-    buttons.append([InlineKeyboardButton("🔙 رجوع", callback_data="go_back")])
-    return InlineKeyboardMarkup(buttons)
-
-
-async def handle_currency_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-
-    if query.data == "show_more":
-        await query.edit_message_reply_markup(reply_markup=build_all_currency_buttons())
-        return
-
-    if query.data == "go_back":
-        country = last_countries.get(user_id)
-        markup = build_currency_buttons(country) if country else build_currency_buttons("فلسطين")
-        await query.edit_message_reply_markup(reply_markup=markup)
-        return
-
-    currency_code = query.data.replace("conv_", "") if query.data.startswith("conv_") else query.data
-    price_jod = last_prices.get(user_id)
-    if not price_jod:
-        await query.edit_message_text("❗️ لم يتم تحديد أي سعر للتحويل.")
-        return
-
-    rate = exchange_rates.get(currency_code)
-    if not rate:
-        await query.edit_message_text("❌ العملة غير مدعومة.")
-        return
-
-    rate_with_margin = round(rate * 1.07, 4)
-    converted = round(price_jod * rate_with_margin, 2)
-    currency_name = currency_names.get(currency_code, currency_code)
-
-    await query.edit_message_text(
-        f"💱 السعر المحوّل:\n{price_jod} دينار أردني ≈ {converted} {currency_name}\n"
-        f"🧮 (1 دينار = {rate_with_margin} {currency_name} بعد إضافة 7%)"
     )
