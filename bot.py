@@ -125,6 +125,26 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ الدولة غير مدرجة في قائمة الشحن")
             return
 
+        
+        # إذا فقط اسم الدولة
+        if len(parts) == 1:
+            if country == "فلسطين":
+                await update.message.reply_text("⚠️ يرجى كتابة: فلسطين [المنطقة] لعرض تفاصيل الأسعار.")
+                return
+            zone = country_zone_map.get(country)
+            if not zone:
+                await update.message.reply_text("❌ لم يتم العثور على تصنيف للمنطقة.")
+                return
+            base, extra = zone_prices.get(zone, (None, None))
+            if base is None:
+                await update.message.reply_text("❌ لم يتم العثور على أسعار الشحن لهذه الدولة.")
+                return
+            message = f"""📦 *{country}* (المنطقة {zone})
+💰 السعر لأول 0.5 كغ: **{base} دينار**
+➕ السعر لكل 0.5 كغ إضافي: **{extra} دينار**"""
+            await update.message.reply_markdown(message, reply_markup=build_currency_buttons(country))
+            return
+
         if country == "فلسطين":
             region = parts[1]
             remaining = parts[2:]
