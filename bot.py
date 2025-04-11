@@ -1,5 +1,7 @@
+
 import math
 import os
+import re
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 from rapidfuzz import process
@@ -31,7 +33,6 @@ special_cases = {
     "تركيا": lambda w: 30 + math.ceil((w - 2) / 0.5) * 5 if w > 2 else 30
 }
 
-# --- Aliases: أسماء بديلة للدول ---
 country_aliases = {
     "امريكا": "الولايات المتحدة",
     "أمريكا": "الولايات المتحدة",
@@ -66,6 +67,23 @@ country_aliases = {
 def convert_arabic_numerals(text):
     return text.translate(str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789"))
 
+def extract_weight_from_text(text: str):
+    text = convert_arabic_numerals(text)
+    matches = re.findall(r'(\d+)\s*(صيفي(?:ة)?|شتوي(?:ة)?)', text)
+    total_weight = 0
+    detail_parts = []
+    for count, type_ in matches:
+        count = int(count)
+        if "صيف" in type_:
+            w = count * 0.5
+            total_weight += w
+            detail_parts.append(f"{count} صيفي = {w} كغ")
+        elif "شت" in type_:
+            w = count * 1.0
+            total_weight += w
+            detail_parts.append(f"{count} شتوي = {w} كغ")
+    return total_weight, " + ".join(detail_parts)
+
 def get_weight_from_pieces(pieces: int, type_: str) -> float:
     if "صيف" in type_:
         return pieces * 0.5
@@ -87,17 +105,13 @@ def calculate_shipping(country, weight, region=None):
         if price == "منطقة غير صحيحة":
             return "⚠️ المنطقة غير صحيحة. يرجى اختيار (الضفة، القدس، الداخل)"
         return f"السعر: {price} دينار\nالتفاصيل: {weight:.1f} كغ → استثناء خاص ({country} - {region})"
-
     if country in special_cases:
         price = special_cases[country](weight)
         return f"السعر: {price} دينار\nالتفاصيل: {weight:.1f} كغ → استثناء خاص ({country})"
-
     zone = country_zone_map.get(country)
     if not zone:
         return "❌ الدولة غير مدرجة في قائمة الشحن"
-
     base, extra = zone_prices[zone]
-
     if weight <= 0.5:
         total = base
         breakdown = f"{base} (حتى 0.5 كغ)"
@@ -106,25 +120,20 @@ def calculate_shipping(country, weight, region=None):
         extra_cost = extra_units * extra
         total = base + extra_cost
         breakdown = f"{base} (أساسي) + {extra_cost} (وزن إضافي: {extra_units} × {extra})"
-
     return f"السعر: {total} دينار\nالتفاصيل: {weight:.1f} كغ → المنطقة {zone} → {breakdown}"
 
-# --- الرد على الرسائل ---
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         text = update.message.text.strip().replace("ه", "ة")
         parts = text.split()
-
         if len(parts) < 2:
             await update.message.reply_text("⚠️ يرجى كتابة: الدولة [الوزن كغ] أو [عدد] [صيفي/شتوي]")
             return
-
         country_input = parts[0]
         country = match_country(country_input, list(country_zone_map.keys()) + list(special_cases.keys()))
         if not country:
             await update.message.reply_text("❌ الدولة غير مدرجة في قائمة الشحن")
             return
-
         if country == "فلسطين":
             if len(parts) < 3:
                 await update.message.reply_text("⚠️ يرجى كتابة: فلسطين [المنطقة] [الوزن أو عدد القطع]")
@@ -134,40 +143,32 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             region = None
             remaining = parts[1:]
-
-        rest = convert_arabic_numerals(" ".join(remaining)).replace("كغ", "").strip()
-
+        rest_text = " ".join(remaining)
+        weight = None
+        details = ""
         try:
-            weight = float(rest.replace(" ", ""))
+            weight = float(convert_arabic_numerals(rest_text.replace("كغ", "").strip()))
         except:
-            numbers = [word for word in remaining if word.isdigit() or any(c in "٠١٢٣٤٥٦٧٨٩" for c in word)]
-            types = [word for word in remaining if "صيف" in word or "شت" in word]
-
-            if numbers and types:
-                count = int(convert_arabic_numerals(numbers[0]))
-                type_ = " ".join(types)
-                weight = get_weight_from_pieces(count, type_)
-                if weight == -1:
-                    raise Exception("نوع القطع غير معروف")
-            else:
-                await update.message.reply_text("⚠️ لم أتمكن من فهم الوزن أو عدد القطع.")
-                return
-
+            weight, details = extract_weight_from_text(rest_text)
+        if weight == 0:
+            await update.message.reply_text("⚠️ لم أتمكن من حساب الوزن من المدخلات.")
+            return
         response = calculate_shipping(country, weight, region if country == "فلسطين" else None)
-        await update.message.reply_text(response)
+        if details:
+            response = f"تم احتساب الوزن كالتالي:
+{details}
 
+" + response
+        await update.message.reply_text(response)
     except Exception as e:
         await update.message.reply_text(f"حدث خطأ غير متوقع: {e}")
 
-# --- Webhook لـ Render ---
 if __name__ == '__main__':
     from telegram.ext import Application
     print("🚀 البوت يعمل باستخدام Webhook")
-
     port = int(os.environ.get("PORT", 8443))
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
-
     app.run_webhook(
         listen="0.0.0.0",
         port=port,
