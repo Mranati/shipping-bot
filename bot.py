@@ -123,6 +123,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # إذا فقط اسم الدولة
         if len(parts) == 1:
             if country == "فلسطين":
+    region = parts[1]
+    remaining = parts[2:]
             region = parts[1]
             remaining = parts[2:]
                 await update.message.reply_text("⚠️ يرجى كتابة: فلسطين [المنطقة] لعرض تفاصيل الأسعار.")
@@ -142,6 +144,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         if country == "فلسطين":
+    region = parts[1]
+    remaining = parts[2:]
             region = parts[1]
             remaining = parts[2:]
             if len(parts) < 3:
