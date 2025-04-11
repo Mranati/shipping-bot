@@ -112,6 +112,7 @@ def build_all_currency_buttons():
     return InlineKeyboardMarkup(buttons)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        text = update.message.text.strip().replace("ه", "ة")
     try:
         parts = text.split()
         
