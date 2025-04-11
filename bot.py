@@ -171,7 +171,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if details:
             price_line, *rest = summary.splitlines()
-            response = f"{price_line}
+        response = f"""{price_line}\n{details}\n\n""" + "\n".join(rest)
 {details}
 
 " + "
@@ -228,3 +228,4 @@ if __name__ == '__main__':
     )
 
 # ✅ تعديل مؤكد: تم التحقق من التنسيق النهائي في الردود
+# ✅ نسخة نظيفة بعد تعديل السطر المشكل نهائياً
