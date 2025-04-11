@@ -115,7 +115,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         text = update.message.text.strip().replace("ه", "ة")
         parts = text.split()
-        if len(parts) < 2:
+        # شرط تم تعطيله مؤقتاً للسماح بجملة الدولة فقط
             await update.message.reply_text("⚠️ يرجى كتابة: الدولة [الوزن كغ] أو [عدد] [صيفي/شتوي]")
             return
 
