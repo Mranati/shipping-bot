@@ -115,14 +115,30 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         text = update.message.text.strip().replace("ه", "ة")
         parts = text.split()
-        if len(parts) < 2:
-            await update.message.reply_text("⚠️ يرجى كتابة: الدولة [الوزن كغ] أو [عدد] [صيفي/شتوي]")
-            return
 
         country_input = parts[0]
         country = match_country(country_input, list(country_zone_map.keys()) + list(special_cases.keys()))
         if not country:
             await update.message.reply_text("❌ الدولة غير مدرجة في قائمة الشحن")
+            return
+
+        # إذا فقط اسم الدولة
+        if len(parts) == 1:
+            if country == "فلسطين":
+                await update.message.reply_text("⚠️ يرجى كتابة: فلسطين [المنطقة] لعرض تفاصيل الأسعار.")
+                return
+            zone = country_zone_map.get(country)
+            if not zone:
+                await update.message.reply_text("❌ لم يتم العثور على تصنيف للمنطقة.")
+                return
+            base, extra = zone_prices.get(zone, (None, None))
+            if base is None:
+                await update.message.reply_text("❌ لم يتم العثور على أسعار الشحن لهذه الدولة.")
+                return
+            message = f"""📦 *{country}* (المنطقة {zone})
+💰 السعر لأول 0.5 كغ: **{base} دينار**
+➕ السعر لكل 0.5 كغ إضافي: **{extra} دينار**"""
+            await update.message.reply_markdown(message, reply_markup=build_currency_buttons(country))
             return
 
         if country == "فلسطين":
@@ -155,7 +171,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if details:
             price_line, *rest = summary.splitlines()
-            response = f"{price_line}\n{details}\n\n" + "\n".join(rest)
+            response = f"{price_line}
+{details}
+
+" + "
+".join(rest)
         else:
             response = summary
 
