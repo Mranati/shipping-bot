@@ -4,7 +4,7 @@ import math
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 from rapidfuzz import process
-from country_zone_map_full_UPDATED import country_zone_map, country_aliases, zone_prices, special_cases, special_cases_palestine, exchange_rates
+from country_zone_map_full_UPDATED_FINAL import country_zone_map, country_aliases, zone_prices, special_cases, special_cases_palestine, exchange_rates
 
 # --- إعدادات عامة ---
 last_prices = {}
