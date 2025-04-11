@@ -121,6 +121,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         country_input = parts[0]
         country = match_country(country_input, list(country_zone_map.keys()) + list(special_cases.keys()))
+        await update.message.reply_text(f"🪪 الدولة المتعرف عليها: {country or '❌ لا شيء'}")
         if not country:
             await update.message.reply_text("❌ الدولة غير مدرجة في قائمة الشحن")
             return
