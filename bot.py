@@ -112,119 +112,119 @@ def build_all_currency_buttons():
     return InlineKeyboardMarkup(buttons)
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        try:
-            text = update.message.text.strip().replace("ه", "ة")
-            parts = text.split()
-            # شرط تم تعطيله مؤقتاً للسماح بجملة الدولة فقط
-
-            country_input = parts[0]
     try:
-            country = match_country(country_input, list(country_zone_map.keys()) + list(special_cases.keys()))
-            await update.message.reply_text(f"🪪 الدولة المتعرف عليها: {country or '❌ لا شيء'}")
-            if not country:
-                await update.message.reply_text("❌ الدولة غير مدرجة في قائمة الشحن")
-        return
+    text = update.message.text.strip().replace("ه", "ة")
+    parts = text.split()
+    # شرط تم تعطيله مؤقتاً للسماح بجملة الدولة فقط
 
-            if len(parts) == 1:
-                if country == "فلسطين":
-        return
-                zone = country_zone_map.get(country)
-                if not zone:
-                    await update.message.reply_text("❌ لم يتم العثور على تصنيف للمنطقة.")
-        return
-                base, extra = zone_prices.get(zone, (None, None))
-                if base is None:
-                    await update.message.reply_text("❌ لم يتم العثور على أسعار الشحن لهذه الدولة.")
-        return
-                message = f"""📦 *{country}* (المنطقة {zone})
+    country_input = parts[0]
+    try:
+    country = match_country(country_input, list(country_zone_map.keys()) + list(special_cases.keys()))
+    await update.message.reply_text(f"🪪 الدولة المتعرف عليها: {country or '❌ لا شيء'}")
+    if not country:
+    await update.message.reply_text("❌ الدولة غير مدرجة في قائمة الشحن")
+    return
+
+    if len(parts) == 1:
+    if country == "فلسطين":
+    return
+    zone = country_zone_map.get(country)
+    if not zone:
+    await update.message.reply_text("❌ لم يتم العثور على تصنيف للمنطقة.")
+    return
+    base, extra = zone_prices.get(zone, (None, None))
+    if base is None:
+    await update.message.reply_text("❌ لم يتم العثور على أسعار الشحن لهذه الدولة.")
+    return
+    message = f"""📦 *{country}* (المنطقة {zone})
     💰 السعر لأول 0.5 كغ: **{base} دينار**
     ➕ السعر لكل 0.5 كغ إضافي: **{extra} دينار**"""
-                await update.message.reply_markdown(message, reply_markup=build_currency_buttons(country))
-        return
+    await update.message.reply_markdown(message, reply_markup=build_currency_buttons(country))
+    return
 
-                await update.message.reply_text("❌ الدولة غير مدرجة في قائمة الشحن")
-        return
+    await update.message.reply_text("❌ الدولة غير مدرجة في قائمة الشحن")
+    return
 
-            if country == "فلسطين":
-                region = parts[1]
-                remaining = parts[2:]
-                if len(parts) < 3:
-        return
-            else:
-                region = None
-                remaining = parts[1:]
+    if country == "فلسطين":
+    region = parts[1]
+    remaining = parts[2:]
+    if len(parts) < 3:
+    return
+    else:
+    region = None
+    remaining = parts[1:]
 
-            rest_text = " ".join(remaining)
-            weight = 0
-            details = ""
+    rest_text = " ".join(remaining)
+    weight = 0
+    details = ""
 
-            try:
-                weight = float(convert_arabic_numerals(rest_text.replace("كغ", "").strip()))
-            except:
-                weight, details = extract_weight_from_text(rest_text)
+    try:
+    weight = float(convert_arabic_numerals(rest_text.replace("كغ", "").strip()))
+    except:
+    weight, details = extract_weight_from_text(rest_text)
 
-            if weight == 0:
-                await update.message.reply_text("⚠️ لم أتمكن من حساب الوزن من المدخلات.")
-        return
+    if weight == 0:
+    await update.message.reply_text("⚠️ لم أتمكن من حساب الوزن من المدخلات.")
+    return
 
-            summary, price = calculate_shipping(country, weight, region if country == "فلسطين" else None)
-            if not price:
-                await update.message.reply_text(summary)
-        return
+    summary, price = calculate_shipping(country, weight, region if country == "فلسطين" else None)
+    if not price:
+    await update.message.reply_text(summary)
+    return
 
-            if details:
-                price_line, *rest = summary.splitlines()
-                response = f"{price_line}\n{details}\n\n" + "\n".join(rest)
-            else:
-                response = summary
+    if details:
+    price_line, *rest = summary.splitlines()
+    response = f"{price_line}\n{details}\n\n" + "\n".join(rest)
+    else:
+    response = summary
 
-            user_id = update.effective_user.id
-            last_prices[user_id] = price
-            last_countries[user_id] = country
-            await update.message.reply_text(response, reply_markup=build_currency_buttons(country))
+    user_id = update.effective_user.id
+    last_prices[user_id] = price
+    last_countries[user_id] = country
+    await update.message.reply_text(response, reply_markup=build_currency_buttons(country))
 
-        except Exception as e:
-        await update.message.reply_text(f"حدث خطأ غير متوقع: {e}")
+    except Exception as e:
+    await update.message.reply_text(f"حدث خطأ غير متوقع: {e}")
 
-async def handle_currency_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def handle_currency_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
 
     if query.data == "show_more":
-        await query.edit_message_reply_markup(reply_markup=build_all_currency_buttons())
-        return
+    await query.edit_message_reply_markup(reply_markup=build_all_currency_buttons())
+    return
 
     currency_code = query.data.replace("conv_", "") if query.data.startswith("conv_") else query.data
     price_jod = last_prices.get(user_id)
     if not price_jod:
-        await query.edit_message_text("❗️ لم يتم تحديد أي سعر للتحويل.")
-        return
+    await query.edit_message_text("❗️ لم يتم تحديد أي سعر للتحويل.")
+    return
 
     rate = exchange_rates.get(currency_code)
     if not rate:
-        await query.edit_message_text("❌ العملة غير مدعومة.")
-        return
+    await query.edit_message_text("❌ العملة غير مدعومة.")
+    return
 
     rate_with_margin = round(rate * 1.07, 4)
     converted = round(price_jod * rate_with_margin, 2)
     currency_name = currency_names.get(currency_code, currency_code)
 
     await query.edit_message_text(
-        f"💱 السعر المحوّل:\n{price_jod} دينار أردني ≈ {converted} {currency_name}\n"
-        f"🧮 (1 دينار = {rate_with_margin} {currency_name} بعد إضافة 7%)"
+    f"💱 السعر المحوّل:\n{price_jod} دينار أردني ≈ {converted} {currency_name}\n"
+    f"🧮 (1 دينار = {rate_with_margin} {currency_name} بعد إضافة 7%)"
     )
 
-if __name__ == '__main__':
+    if __name__ == '__main__':
     TOKEN = os.getenv("TOKEN")
     app = ApplicationBuilder().token(TOKEN).build()
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     app.add_handler(CallbackQueryHandler(handle_currency_selection))
     app.run_webhook(
-        listen="0.0.0.0",
-        port=int(os.environ.get("PORT", 8443)),
-        webhook_url=f"https://{os.environ['RENDER_EXTERNAL_HOSTNAME']}/"
+    listen="0.0.0.0",
+    port=int(os.environ.get("PORT", 8443)),
+    webhook_url=f"https://{os.environ['RENDER_EXTERNAL_HOSTNAME']}/"
     )    except Exception as e:
-        await update.message.reply_text(f"⚠️ حدث خطأ داخلي غير متوقع: {e}")
-        return
+    await update.message.reply_text(f"⚠️ حدث خطأ داخلي غير متوقع: {e}")
+    return
     await update.message.reply_text("⚠️ لم يتمكن البوت من فهم المدخل. يرجى إعادة المحاولة بطريقة صحيحة.")
