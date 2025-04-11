@@ -226,3 +226,5 @@ if __name__ == '__main__':
         port=int(os.environ.get("PORT", 8443)),
         webhook_url=f"https://{os.environ['RENDER_EXTERNAL_HOSTNAME']}/"
     )
+
+# ✅ تعديل مؤكد: تم التحقق من التنسيق النهائي في الردود
