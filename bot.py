@@ -10,7 +10,6 @@ from country_zone_map_full_UPDATED_FINAL_SMART import country_zone_map, country_
 last_prices = {}
 last_countries = {}
 
-# ليلأسماء العملات بالعربي
 # أسماء العملات بالعربي
 currency_names = {
     "USD": "دولار أمريكي",
