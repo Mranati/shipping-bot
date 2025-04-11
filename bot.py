@@ -121,10 +121,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         country_input = parts[0]
         country = match_country(country_input, list(country_zone_map.keys()) + list(special_cases.keys()))
-        if not country:
-            await update.message.reply_text("❌ الدولة غير مدرجة في قائمة الشحن")
-            return
-
+        
         # إذا فقط اسم الدولة
         if len(parts) == 1:
             if country == "فلسطين":
@@ -144,6 +141,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_markdown(message, reply_markup=build_currency_buttons(country))
             return
 
+        if not country:
             await update.message.reply_text("❌ الدولة غير مدرجة في قائمة الشحن")
             return
 
