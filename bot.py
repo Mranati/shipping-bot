@@ -1,4 +1,8 @@
 
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ApplicationBuilder, MessageHandler, CallbackQueryHandler, filters, ContextTypes
+import os
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         text = update.message.text.strip().replace("ه", "ة")
@@ -29,7 +33,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         try:
             weight = float(convert_arabic_numerals(rest_text.replace("كغ", "").strip()))
-        except:
+        except Exception:
             weight, details = extract_weight_from_text(rest_text)
 
         if weight == 0:
@@ -49,7 +53,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         last_prices[update.effective_user.id] = price
         await update.message.reply_text(response, reply_markup=build_currency_keyboard())
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 
     except Exception as e:
         await update.message.reply_text(f"حدث خطأ غير متوقع: {e}")
