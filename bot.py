@@ -125,7 +125,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ الدولة غير مدرجة في قائمة الشحن")
             return
 
-        
         # إذا فقط اسم الدولة
         if len(parts) == 1:
             if country == "فلسطين":
@@ -143,6 +142,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 💰 السعر لأول 0.5 كغ: **{base} دينار**
 ➕ السعر لكل 0.5 كغ إضافي: **{extra} دينار**"""
             await update.message.reply_markdown(message, reply_markup=build_currency_buttons(country))
+            return
+
+            await update.message.reply_text("❌ الدولة غير مدرجة في قائمة الشحن")
             return
 
         if country == "فلسطين":
