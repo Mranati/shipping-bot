@@ -49,6 +49,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         last_prices[update.effective_user.id] = price
         await update.message.reply_text(response, reply_markup=build_currency_keyboard())
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 
     except Exception as e:
         await update.message.reply_text(f"حدث خطأ غير متوقع: {e}")
