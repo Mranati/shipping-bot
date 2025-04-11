@@ -113,6 +113,7 @@ def build_all_currency_buttons():
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
+        parts = text.split()
         
         # --- تسعيرة الدولة فقط بدون وزن ---
         if len(parts) == 1:
