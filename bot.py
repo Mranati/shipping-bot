@@ -91,8 +91,6 @@ def calculate_shipping(country, weight, region=None):
     base, extra = zone_prices[zone]
     if weight <= 0.5:
         total = base
-    else:
-        total = base + math.ceil((weight - 0.5) / 0.5) * extra
     return f"السعر: {total} دينار\nالتفاصيل: {weight:.1f} كغ → المنطقة {zone}", total
 
 def build_currency_buttons(country):
@@ -147,8 +145,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 return
             region = parts[1]
             remaining = parts[2:]
-        else:
-            region = None
             remaining = parts[1:]
 
         rest_text = " ".join(remaining)
@@ -173,8 +169,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             price_line, *rest = summary.splitlines()
         response = f"{price_line}\n" + details + "\n\n" + "\n".join(rest)
 
-        else:
-            response = summary
 
         user_id = update.effective_user.id
         last_prices[user_id] = price
