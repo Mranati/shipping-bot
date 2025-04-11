@@ -91,6 +91,8 @@ def calculate_shipping(country, weight, region=None):
     base, extra = zone_prices[zone]
     if weight <= 0.5:
         total = base
+    else:
+        total = base + math.ceil((weight - 0.5) / 0.5) * extra
     return f"السعر: {total} دينار\nالتفاصيل: {weight:.1f} كغ → المنطقة {zone}", total
 
 def build_currency_buttons(country):
@@ -113,6 +115,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         text = update.message.text.strip().replace("ه", "ة")
         parts = text.split()
+        if len(parts) < 2:
+            await update.message.reply_text("⚠️ يرجى كتابة: الدولة [الوزن كغ] أو [عدد] [صيفي/شتوي]")
+            return
 
         country_input = parts[0]
         country = match_country(country_input, list(country_zone_map.keys()) + list(special_cases.keys()))
@@ -120,39 +125,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("❌ الدولة غير مدرجة في قائمة الشحن")
             return
 
-        # إذا فقط اسم الدولة
-        if len(parts) == 1:
-            if country == "فلسطين":
-    region = parts[1]
-    remaining = parts[2:]
-            region = parts[1]
-            remaining = parts[2:]
-                await update.message.reply_text("⚠️ يرجى كتابة: فلسطين [المنطقة] لعرض تفاصيل الأسعار.")
-                return
-            zone = country_zone_map.get(country)
-            if not zone:
-                await update.message.reply_text("❌ لم يتم العثور على تصنيف للمنطقة.")
-                return
-            base, extra = zone_prices.get(zone, (None, None))
-            if base is None:
-                await update.message.reply_text("❌ لم يتم العثور على أسعار الشحن لهذه الدولة.")
-                return
-            message = f"""📦 *{country}* (المنطقة {zone})
-💰 السعر لأول 0.5 كغ: **{base} دينار**
-➕ السعر لكل 0.5 كغ إضافي: **{extra} دينار**"""
-            await update.message.reply_markdown(message, reply_markup=build_currency_buttons(country))
-            return
-
         if country == "فلسطين":
-    region = parts[1]
-    remaining = parts[2:]
             region = parts[1]
             remaining = parts[2:]
             if len(parts) < 3:
                 await update.message.reply_text("⚠️ يرجى كتابة: فلسطين [المنطقة] [الوزن أو عدد القطع]")
                 return
-            region = parts[1]
-            remaining = parts[2:]
+        else:
+            region = None
             remaining = parts[1:]
 
         rest_text = " ".join(remaining)
@@ -175,8 +155,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if details:
             price_line, *rest = summary.splitlines()
-        response = f"{price_line}\n" + details + "\n\n" + "\n".join(rest)
-
+            response = f"{price_line}\n{details}\n\n" + "\n".join(rest)
+        else:
+            response = summary
 
         user_id = update.effective_user.id
         last_prices[user_id] = price
@@ -225,6 +206,3 @@ if __name__ == '__main__':
         port=int(os.environ.get("PORT", 8443)),
         webhook_url=f"https://{os.environ['RENDER_EXTERNAL_HOSTNAME']}/"
     )
-
-# ✅ تعديل مؤكد: تم التحقق من التنسيق النهائي في الردود
-# ✅ نسخة نظيفة بعد تعديل السطر المشكل نهائياً
