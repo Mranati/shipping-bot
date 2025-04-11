@@ -206,3 +206,47 @@ if __name__ == '__main__':
         port=int(os.environ.get("PORT", 8443)),
         webhook_url=f"https://{os.environ['RENDER_EXTERNAL_HOSTNAME']}/"
     )
+
+
+def build_all_currency_buttons():
+    buttons = []
+    for code, name in currency_names.items():
+        buttons.append([InlineKeyboardButton(f"💱 التحويل لـ {name}", callback_data=f"conv_{code}")])
+    buttons.append([InlineKeyboardButton("🔙 رجوع", callback_data="go_back")])
+    return InlineKeyboardMarkup(buttons)
+
+
+async def handle_currency_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+
+    if query.data == "show_more":
+        await query.edit_message_reply_markup(reply_markup=build_all_currency_buttons())
+        return
+
+    if query.data == "go_back":
+        country = last_countries.get(user_id)
+        markup = build_currency_buttons(country) if country else build_currency_buttons("فلسطين")
+        await query.edit_message_reply_markup(reply_markup=markup)
+        return
+
+    currency_code = query.data.replace("conv_", "") if query.data.startswith("conv_") else query.data
+    price_jod = last_prices.get(user_id)
+    if not price_jod:
+        await query.edit_message_text("❗️ لم يتم تحديد أي سعر للتحويل.")
+        return
+
+    rate = exchange_rates.get(currency_code)
+    if not rate:
+        await query.edit_message_text("❌ العملة غير مدعومة.")
+        return
+
+    rate_with_margin = round(rate * 1.07, 4)
+    converted = round(price_jod * rate_with_margin, 2)
+    currency_name = currency_names.get(currency_code, currency_code)
+
+    await query.edit_message_text(
+        f"💱 السعر المحوّل:\n{price_jod} دينار أردني ≈ {converted} {currency_name}\n"
+        f"🧮 (1 دينار = {rate_with_margin} {currency_name} بعد إضافة 7%)"
+    )
