@@ -155,10 +155,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
         response = calculate_shipping(country, weight, region if country == "فلسطين" else None)
         if details:
-            response = f"تم احتساب الوزن كالتالي:
+           response = f"""تم احتساب الوزن كالتالي:
 {details}
 
-" + response
+{response}
+"""
+
         await update.message.reply_text(response)
     except Exception as e:
         await update.message.reply_text(f"حدث خطأ غير متوقع: {e}")
