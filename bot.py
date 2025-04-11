@@ -154,12 +154,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ لم أتمكن من حساب الوزن من المدخلات.")
             return
         response = calculate_shipping(country, weight, region if country == "فلسطين" else None)
+                summary = calculate_shipping(country, weight, region if country == "فلسطين" else None)
         if details:
-           response = f"""تم احتساب الوزن كالتالي:
-{details}
+            price_line, *rest = summary.splitlines()
+            response = f"{price_line}\n{details}\n\n" + "\n".join(rest)
+        else:
+            response = summary
 
-{response}
-"""
 
         await update.message.reply_text(response)
     except Exception as e:
