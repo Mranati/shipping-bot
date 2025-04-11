@@ -171,7 +171,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if details:
             price_line, *rest = summary.splitlines()
-        response = f"""{price_line}\n{details}\n\n""" + "\n".join(rest)
+        response = f"{price_line}\n" + details + "\n\n" + "\n".join(rest)
 {details}
 
 " + "
