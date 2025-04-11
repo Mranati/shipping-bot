@@ -1,4 +1,5 @@
 TOKEN = os.getenv("TOKEN")
+import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, MessageHandler, CallbackQueryHandler, filters, ContextTypes
 import os
