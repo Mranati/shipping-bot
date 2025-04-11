@@ -117,23 +117,39 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         parts = text.split()
         
         # --- تسعيرة الدولة فقط بدون وزن ---
-        if len(parts) == 1:
-            matched_country = match_country(text, list(country_zone_map.keys()) + list(special_cases.keys()))
-            if matched_country:
-                if matched_country in special_cases:
-                    example_weight = 2 if matched_country in ["سوريا", "لبنان", "العراق", "تركيا", "فلسطين"] else 0.5
-                    example_price, _ = calculate_shipping(matched_country, example_weight)
-                    example_line = f"مثال: {example_price.splitlines()[0]}"
-                    response = f"{matched_country} 🇶🇦\nتعتمد الأسعار على الوزن\n{example_line}"
-                else:
-                    zone = country_zone_map.get(matched_country)
-                    if zone and zone in zone_prices:
-                        base, extra = zone_prices[zone]
-                        response = f"{matched_country} 🇶🇦\n{base} دينار لأول 0.5 كغ\n{extra} دينار لكل 0.5 كغ إضافي"
-                    else:
-                        response = "❌ الدولة غير مدرجة في قائمة الشحن"
-                await update.message.reply_text(response, reply_markup=build_currency_buttons(matched_country))
-                return
+        
+if len(parts) == 1:
+    matched_country = match_country(text, list(country_zone_map.keys()) + list(special_cases.keys()))
+    if matched_country:
+        if matched_country == "فلسطين":
+            response = (
+                "الضفة: 11 دينار لأول 2 كغ + 5 دينار لكل 0.5 كغ إضافي\n"
+                "القدس: 13 دينار لأول 2 كغ + 5 دينار لكل 0.5 كغ إضافي\n"
+                "الداخل: 20 دينار لأول 2 كغ + 5 دينار لكل 0.5 كغ إضافي"
+            )
+        elif matched_country == "السعودية":
+            response = (
+                "15 دينار لأول 0.5 كغ\n"
+                "5 دينار لكل 0.5 كغ إضافي"
+            )
+        elif matched_country in ["سوريا", "لبنان", "العراق", "تركيا"]:
+            response = (
+                "35 دينار لأول 2 كغ\n"
+                "5 دينار لكل 0.5 كغ إضافي"
+            )
+        elif matched_country in country_zone_map:
+            zone = country_zone_map.get(matched_country)
+            if zone and zone in zone_prices:
+                base, extra = zone_prices[zone]
+                response = f"{base} دينار لأول 0.5 كغ\n{extra} دينار لكل 0.5 كغ إضافي"
+            else:
+                response = "❌ الدولة غير مدرجة في قائمة الشحن"
+        else:
+            response = "❌ الدولة غير مدرجة في قائمة الشحن"
+
+        await update.message.reply_text(response, reply_markup=build_currency_buttons(matched_country))
+        return
+
 
         if len(parts) < 2:
             await update.message.reply_text("⚠️ يرجى كتابة: الدولة [الوزن كغ] أو [عدد] [صيفي/شتوي]")
