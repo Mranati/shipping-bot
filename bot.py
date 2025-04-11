@@ -118,7 +118,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # --- تسعيرة الدولة فقط بدون وزن ---
         if len(parts) == 1:
-            matched_country = match_country(country_input, list(country_zone_map.keys()) + list(special_cases.keys()))
+            matched_country = match_country(text, list(country_zone_map.keys()) + list(special_cases.keys()))
             if matched_country:
                 if matched_country in special_cases:
                     example_weight = 2 if matched_country in ["سوريا", "لبنان", "العراق", "تركيا", "فلسطين"] else 0.5
