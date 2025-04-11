@@ -261,91 +261,91 @@ if __name__ == '__main__':
     )
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    try:
-        text = update.message.text.strip().replace("ه", "ة")
-        parts = text.split()
-
-        # --- تسعيرة الدولة فقط بدون وزن ---
-        if len(parts) == 1:
-            matched_country = match_country(text, list(country_zone_map.keys()) + list(special_cases.keys()))
-            if matched_country:
-                if matched_country == "فلسطين":
-                    response = (
-                        "الضفة: 11 دينار لأول 2 كغ + 5 دينار لكل 0.5 كغ إضافي\n"
-                        "القدس: 13 دينار لأول 2 كغ + 5 دينار لكل 0.5 كغ إضافي\n"
-                        "الداخل: 20 دينار لأول 2 كغ + 5 دينار لكل 0.5 كغ إضافي"
-                    )
-                elif matched_country == "السعودية":
-                    response = (
-                        "15 دينار لأول 0.5 كغ\n"
-                        "5 دينار لكل 0.5 كغ إضافي"
-                    )
-                elif matched_country in ["سوريا", "لبنان", "العراق", "تركيا"]:
-                    response = (
-                        "35 دينار لأول 2 كغ\n"
-                        "5 دينار لكل 0.5 كغ إضافي"
-                    )
-                elif matched_country in country_zone_map:
-                    zone = country_zone_map.get(matched_country)
-                    if zone and zone in zone_prices:
-                        base, extra = zone_prices[zone]
-                        response = f"{base} دينار لأول 0.5 كغ\n{extra} دينار لكل 0.5 كغ إضافي"
+        try:
+            text = update.message.text.strip().replace("ه", "ة")
+            parts = text.split()
+    
+            # --- تسعيرة الدولة فقط بدون وزن ---
+            if len(parts) == 1:
+                matched_country = match_country(text, list(country_zone_map.keys()) + list(special_cases.keys()))
+                if matched_country:
+                    if matched_country == "فلسطين":
+                        response = (
+                            "الضفة: 11 دينار لأول 2 كغ + 5 دينار لكل 0.5 كغ إضافي\n"
+                            "القدس: 13 دينار لأول 2 كغ + 5 دينار لكل 0.5 كغ إضافي\n"
+                            "الداخل: 20 دينار لأول 2 كغ + 5 دينار لكل 0.5 كغ إضافي"
+                        )
+                    elif matched_country == "السعودية":
+                        response = (
+                            "15 دينار لأول 0.5 كغ\n"
+                            "5 دينار لكل 0.5 كغ إضافي"
+                        )
+                    elif matched_country in ["سوريا", "لبنان", "العراق", "تركيا"]:
+                        response = (
+                            "35 دينار لأول 2 كغ\n"
+                            "5 دينار لكل 0.5 كغ إضافي"
+                        )
+                    elif matched_country in country_zone_map:
+                        zone = country_zone_map.get(matched_country)
+                        if zone and zone in zone_prices:
+                            base, extra = zone_prices[zone]
+                            response = f"{base} دينار لأول 0.5 كغ\n{extra} دينار لكل 0.5 كغ إضافي"
+                        else:
+                            response = "❌ الدولة غير مدرجة في قائمة الشحن"
                     else:
                         response = "❌ الدولة غير مدرجة في قائمة الشحن"
-                else:
-                    response = "❌ الدولة غير مدرجة في قائمة الشحن"
-
-                await update.message.reply_text(response, reply_markup=build_currency_buttons(matched_country))
+    
+                    await update.message.reply_text(response, reply_markup=build_currency_buttons(matched_country))
+                    return
+    
+            if len(parts) < 2:
+                await update.message.reply_text("⚠️ يرجى كتابة: الدولة [الوزن كغ] أو [عدد] [صيفي/شتوي]")
                 return
-
-        if len(parts) < 2:
-            await update.message.reply_text("⚠️ يرجى كتابة: الدولة [الوزن كغ] أو [عدد] [صيفي/شتوي]")
-            return
-
-        country_input = parts[0]
-        country = match_country(country_input, list(country_zone_map.keys()) + list(special_cases.keys()))
-        if not country:
-            await update.message.reply_text("❌ الدولة غير مدرجة في قائمة الشحن")
-            return
-
-        if country == "فلسطين":
-            if len(parts) < 3:
-                await update.message.reply_text("⚠️ يرجى كتابة: فلسطين [المنطقة] [الوزن أو عدد القطع]")
+    
+            country_input = parts[0]
+            country = match_country(country_input, list(country_zone_map.keys()) + list(special_cases.keys()))
+            if not country:
+                await update.message.reply_text("❌ الدولة غير مدرجة في قائمة الشحن")
                 return
-            region = parts[1]
-            remaining = parts[2:]
-        else:
-            region = None
-            remaining = parts[1:]
-
-        rest_text = " ".join(remaining)
-        weight = 0
-        details = ""
-
-        try:
-            weight = float(convert_arabic_numerals(rest_text.replace("كغ", "").strip()))
-        except:
-            weight, details = extract_weight_from_text(rest_text)
-
-        if weight == 0:
-            await update.message.reply_text("⚠️ لم أتمكن من حساب الوزن من المدخلات.")
-            return
-
-        summary, price = calculate_shipping(country, weight, region if country == "فلسطين" else None)
-        if not price:
-            await update.message.reply_text(summary)
-            return
-
-        if details:
-            price_line, *rest = summary.splitlines()
-            response = f"{price_line}\n{details}\n\n" + "\n".join(rest)
-        else:
-            response = summary
-
-        user_id = update.effective_user.id
-        last_prices[user_id] = price
-        last_countries[user_id] = country
-        await update.message.reply_text(response, reply_markup=build_currency_buttons(country))
-
-    except Exception as e:
-        await update.message.reply_text(f"حدث خطأ غير متوقع: {e}")
+    
+            if country == "فلسطين":
+                if len(parts) < 3:
+                    await update.message.reply_text("⚠️ يرجى كتابة: فلسطين [المنطقة] [الوزن أو عدد القطع]")
+                    return
+                region = parts[1]
+                remaining = parts[2:]
+            else:
+                region = None
+                remaining = parts[1:]
+    
+            rest_text = " ".join(remaining)
+            weight = 0
+            details = ""
+    
+            try:
+                weight = float(convert_arabic_numerals(rest_text.replace("كغ", "").strip()))
+            except:
+                weight, details = extract_weight_from_text(rest_text)
+    
+            if weight == 0:
+                await update.message.reply_text("⚠️ لم أتمكن من حساب الوزن من المدخلات.")
+                return
+    
+            summary, price = calculate_shipping(country, weight, region if country == "فلسطين" else None)
+            if not price:
+                await update.message.reply_text(summary)
+                return
+    
+            if details:
+                price_line, *rest = summary.splitlines()
+                response = f"{price_line}\n{details}\n\n" + "\n".join(rest)
+            else:
+                response = summary
+    
+            user_id = update.effective_user.id
+            last_prices[user_id] = price
+            last_countries[user_id] = country
+            await update.message.reply_text(response, reply_markup=build_currency_buttons(country))
+    
+        except Exception as e:
+            await update.message.reply_text(f"حدث خطأ غير متوقع: {e}")
