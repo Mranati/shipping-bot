@@ -1,4 +1,3 @@
-import math
 country_zone_map = {
     "أبخازيا": "5",
     "أفغانستان": "5",
@@ -303,19 +302,19 @@ zone_prices = {
 
 
 special_cases_palestine = {
-    "الضفة": lambda w: 11 + ((w - 2) // 0.5 + 1) * 5 if w > 2 else 11,
-    "القدس": lambda w: 13 + ((w - 2) // 0.5 + 1) * 5 if w > 2 else 13,
-    "الداخل": lambda w: 20 + ((w - 2) // 0.5 + 1) * 5 if w > 2 else 20
+    "الضفة": lambda w: 11 + ((w - 2) // 0.5) * 5 if w > 2 else 11,
+    "القدس": lambda w: 13 + ((w - 2) // 0.5) * 5 if w > 2 else 13,
+    "الداخل": lambda w: 20 + ((w - 2) // 0.5) * 5 if w > 2 else 20
 }
 
 
 special_cases = {
-    "السعودية": lambda w: (15 + math.ceil((w - 0.5) / 0.5) * 5) if w > 0.5 else 15
+    "السعودية": lambda w: 15 + ((w - 0.5) // 0.5) * 5 if w > 0.5 else 15,
     "فلسطين": lambda w, region: special_cases_palestine.get(region, lambda w: "منطقة غير صحيحة")(w),
-    "سوريا": lambda w: 35 + ((w - 2) // 0.5 + 1) * 5 if w > 2 else 35,
-    "لبنان": lambda w: 35 + ((w - 2) // 0.5 + 1) * 5 if w > 2 else 35,
-    "العراق": lambda w: 30 + ((w - 2) // 0.5 + 1) * 5 if w > 2 else 30,
-    "تركيا": lambda w: 30 + ((w - 2) // 0.5 + 1) * 5 if w > 2 else 30
+    "سوريا": lambda w: 35 + ((w - 2) // 0.5) * 5 if w > 2 else 35,
+    "لبنان": lambda w: 35 + ((w - 2) // 0.5) * 5 if w > 2 else 35,
+    "العراق": lambda w: 30 + ((w - 2) // 0.5) * 5 if w > 2 else 30,
+    "تركيا": lambda w: 30 + ((w - 2) // 0.5) * 5 if w > 2 else 30
 }
 
 
