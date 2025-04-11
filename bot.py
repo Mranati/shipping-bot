@@ -116,6 +116,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         text = update.message.text.strip().replace("ه", "ة")
         parts = text.split()
         # شرط تم تعطيله مؤقتاً للسماح بجملة الدولة فقط
+        if True:
             return
 
         country_input = parts[0]
