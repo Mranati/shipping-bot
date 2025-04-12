@@ -1,4 +1,3 @@
-
 import os
 import math
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
@@ -115,7 +114,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         text = update.message.text.strip().replace("ه", "ة")
         parts = text.split()
-        
+
         # --- تسعيرة الدولة فقط بدون وزن ---
         if len(parts) == 1:
             matched_country = match_country(text, list(country_zone_map.keys()) + list(special_cases.keys()))
@@ -124,12 +123,12 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     example_weight = 2 if matched_country in ["سوريا", "لبنان", "العراق", "تركيا", "فلسطين"] else 0.5
                     example_price, _ = calculate_shipping(matched_country, example_weight)
                     example_line = f"مثال: {example_price.splitlines()[0]}"
-                    response = f"{matched_country} 🇶🇦\nتعتمد الأسعار على الوزن\n{example_line}"
+                    response = f"{matched_country}\nتعتمد الأسعار على الوزن\n{example_line}"
                 else:
                     zone = country_zone_map.get(matched_country)
                     if zone and zone in zone_prices:
                         base, extra = zone_prices[zone]
-                        response = f"{matched_country} 🇶🇦\n{base} دينار لأول 0.5 كغ\n{extra} دينار لكل 0.5 كغ إضافي"
+                        response = f"{matched_country}\n{base} دينار لأول 0.5 كغ\n{extra} دينار لكل 0.5 كغ إضافي"
                     else:
                         response = "❌ الدولة غير مدرجة في قائمة الشحن"
                 await update.message.reply_text(response, reply_markup=build_currency_buttons(matched_country))
