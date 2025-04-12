@@ -90,16 +90,16 @@ def calculate_shipping(country, weight, region=None):
     base, extra = zone_prices[zone]
     if country == "ليبيا":
         if weight <= 0.5:
-        total = base + 15
+            total = base + 15
         else:
             total = base + math.ceil((weight - 0.5) / 0.5) * extra + 15
-        return f"السعر: {total} دينار (تمت اضافة 15د لأنها منطقة حرب)\nالتفاصيل: {weight:.1f} كغ → المنطقة {zone}", total
+            return f"السعر: {total} دينار (تمت اضافة 15د لأنها منطقة حرب)\nالتفاصيل: {weight:.1f} كغ → المنطقة {zone}", total
     else:
         if weight <= 0.5:
             total = base
         else:
             total = base + math.ceil((weight - 0.5) / 0.5) * extra
-        return f"السعر: {total} دينار\nالتفاصيل: {weight:.1f} كغ → المنطقة {zone}", total
+            return f"السعر: {total} دينار\nالتفاصيل: {weight:.1f} كغ → المنطقة {zone}", total
 
 def build_currency_buttons(country):
     buttons = []
