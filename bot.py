@@ -88,7 +88,7 @@ def calculate_shipping(country, weight, region=None):
     if not zone:
         return "❌ الدولة غير مدرجة في قائمة الشحن", None
     base, extra = zone_prices[zone]
-    if country == "ليبيا"
+    if country == "ليبيا":
         if weight <= 0.5:
         total = base + 15
         else:
