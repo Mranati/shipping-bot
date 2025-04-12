@@ -99,7 +99,7 @@ def calculate_shipping(country, weight, region=None):
             total = base
         else:
             total = base + math.ceil((weight - 0.5) / 0.5) * extra
-            return f"السعر: {total} دينار\nالتفاصيل: {weight:.1f} كغ → المنطقة {zone}", total
+        return f"السعر: {total} دينار\nالتفاصيل: {weight:.1f} كغ → المنطقة {zone}", total
 
 def build_currency_buttons(country):
     buttons = []
