@@ -120,7 +120,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             matched_country = match_country(text, list(country_zone_map.keys()) + list(special_cases.keys()))
             if matched_country:
                 if matched_country in special_cases:
-                    example_weight = 2 if matched_country in ["سوريا", "لبنان", "العراق", "تركيا", "فلسطين"] else 0.5
+                    if matched_country in ["فلسطين"]:
+                        response = f"{matched_country}\nلأول 2 كيلو الضفة 11د القدس 13د ااخل 20د\n 5د لكل 0.5 كغ اضافي" 
+                    else
+                    example_weight = 2 if matched_country in ["سوريا", "لبنان", "العراق", "تركيا"] else 0.5
                     example_price, _ = calculate_shipping(matched_country, example_weight)
                     example_line = f"{example_price.splitlines()[0]} لأول 0.5 كغ + 5 دنانير لكل 0.5 كغ اضافي"
                     response = f"{matched_country}\nتعتمد الأسعار على الوزن\n{example_line}"
