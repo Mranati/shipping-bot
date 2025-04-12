@@ -121,19 +121,22 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
             if matched_country:
                 if matched_country in special_cases:
                     if matched_country in ["فلسطين"]:
-                        response = f"{matched_country}\nلأول 2 كغ --> الضفة 11د، القدس 13د، الداخل 20د\n +5د لكل 0.5 كغ اضافي" 
+                        response = f"{matched_country}\nلأول 2 كغ:\nالضفة 11د\nالقدس 13د\nالداخل 20د\n+5د لكل 0.5 كغ اضافي" 
                     else:
                         example_weight = 2 if matched_country in ["سوريا", "لبنان", "العراق", "تركيا"] else 0.5
                         example_price, _ = calculate_shipping(matched_country, example_weight)
                         example_line = f"{example_price.splitlines()[0]} لأول 0.5 كغ + 5 دنانير لكل 0.5 كغ اضافي"
-                        response = f"{matched_country}\nتعتمد الأسعار على الوزن\n{example_line}"
+                        response = f"{matched_country}\n{example_line}"
                 else:
-                    zone = country_zone_map.get(matched_country)
-                    if zone and zone in zone_prices:
-                        base, extra = zone_prices[zone]
-                        response = f"{matched_country}\n{base} دينار لأول 0.5 كغ\n{extra} دينار لكل 0.5 كغ إضافي"
+                    if matched_country in ["ليبيا"]: 
+                        response = f"{matched_country}\n20 دينار لأول 0.5 كغ\n12 دينار لكل 0.5 كغ إضافي\nويضاف 15د على المجموع لأنها منطقة حرب" 
                     else:
-                        response = "❌ الدولة غير مدرجة في قائمة الشحن"
+                        zone = country_zone_map.get(matched_country)
+                        if zone and zone in zone_prices:
+                            base, extra = zone_prices[zone]
+                            response = f"{matched_country}\n{base} دينار لأول 0.5 كغ\n{extra} دينار لكل 0.5 كغ إضافي"
+                        else:
+                            response = "❌ الدولة غير مدرجة في قائمة الشحن"
                 await update.message.reply_text(response, reply_markup=build_currency_buttons(matched_country))
                 return
 
